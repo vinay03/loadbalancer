@@ -13,17 +13,21 @@ func handleErr(err error) {
 }
 
 func main() {
-	// servers := []Server{
-	// 	NewSimpleServer("http://localhost:8081"),
-	// 	NewSimpleServer("http://localhost:8082"),
-	// 	NewSimpleServer("http://localhost:8083"),
-	// }
-	lb := NewLoadBalancer("8000", nil)
+	var yamlConfigFile string
+	if len(os.Args) > 1 {
+		yamlConfigFile = os.Args[1]
+	}
+	_, err := LoadConfigFromFile(yamlConfigFile)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	lb.AddNewServer(NewSimpleServer("http://localhost:8081"))
-	lb.AddNewServer(NewSimpleServer("http://localhost:8082"))
-	lb.AddNewServer(NewSimpleServer("http://localhost:8083"))
+	// lb := NewLoadBalancer("8000")
 
-	// Start LoadBalancing
-	lb.Start()
+	// lb.AddNewServer(NewSimpleServer("http://localhost:8081"))
+	// lb.AddNewServer(NewSimpleServer("http://localhost:8082"))
+	// lb.AddNewServer(NewSimpleServer("http://localhost:8083"))
+
+	// // Start LoadBalancing
+	// _ = lb.Start()
 }

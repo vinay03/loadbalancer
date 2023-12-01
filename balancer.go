@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -9,6 +10,7 @@ type LoadBalancer struct {
 	port            string
 	roundRobinCount int
 	servers         []Server
+	IsRunning       bool
 }
 
 func NewLoadBalancer(port string) *LoadBalancer {
@@ -26,7 +28,6 @@ func (lb *LoadBalancer) getNextAvailableServer() Server {
 	}
 	lb.roundRobinCount++
 	return server
-
 }
 
 func (lb *LoadBalancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
@@ -39,11 +40,17 @@ func (lb *LoadBalancer) AddNewServer(server Server) {
 	lb.servers = append(lb.servers, server)
 }
 
-func (lb *LoadBalancer) Start() {
+func (lb *LoadBalancer) Start() (err error) {
+	if lb.IsRunning {
+		err = errors.New("LoadBalancer is already running")
+		return
+	}
 	handleRedirect := func(rw http.ResponseWriter, req *http.Request) {
 		lb.serveProxy(rw, req)
 	}
 	http.HandleFunc("/", handleRedirect)
 	fmt.Printf("serving requests at 'localhost:%s'\n", lb.port)
 	http.ListenAndServe(":"+lb.port, nil)
+	lb.IsRunning = true
+	return nil
 }
