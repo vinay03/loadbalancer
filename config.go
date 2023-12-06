@@ -5,13 +5,23 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-type LoadBalancerConfig struct {
-	Balancers map[string]Balancer "yaml:balancers"
+type LoadBalancerYAMLConfiguration struct {
+	Balancers map[string]struct {
+		Type    string "yaml:type"
+		Port    int32  "yaml:port"
+		Servers []struct {
+			Address string "yaml:address"
+			Weight  int32  "yaml:weight"
+		} "yaml:servers"
+	} "yaml:balancers"
 }
+
+var DefaultLoadBalancerType string = "RoundRobin"
 
 var supportedBalancers []string = []string{
 	"RoundRobin",
@@ -19,22 +29,20 @@ var supportedBalancers []string = []string{
 	"PerformanceBased",
 }
 
-type Balancer struct {
-	Type     string         "yaml:type"
-	Port     string         "yaml:port"
-	ApiMatch string         "yaml:apiMatch"
-	Servers  []ServerConfig "yaml:servers"
+func IsValidBalancerType(searchType string) (isValid bool) {
+	for _, v := range supportedBalancers {
+		if v == searchType {
+			isValid = true
+			return
+		}
+	}
+	return
 }
 
-type ServerConfig struct {
-	Address string "yaml:address"
-	Weight  int32  "yaml:weight"
-}
-
-func LoadConfigFromFile(filepath string) (cnf *LoadBalancerConfig, err error) {
+func LoadConfigFromFile(filepath string) (cnf *LoadBalancerYAMLConfiguration, err error) {
 	filePathLength := len(filepath)
 	if filePathLength == 0 {
-		panic("Configuration filepath was not provided")
+		panic("Configuration file was not provided")
 	}
 
 	if _, err := os.Stat(filepath); errors.Is(err, os.ErrNotExist) {
@@ -46,31 +54,43 @@ func LoadConfigFromFile(filepath string) (cnf *LoadBalancerConfig, err error) {
 		log.Fatal(err)
 	}
 
-	// Unmarshal YAML config into LoadBalancerConfig object
+	// Unmarshal YAML config into LoadBalancerYAMLConfiguration object
 	cnf = UnmarshalYAML(&f)
-
-	// Validate configurations
-	err = ValidateConfiguration(cnf)
 
 	return
 }
 
-func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerConfig) {
+func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 	// var rawConfig map[string]interface{}
-	cnf = &LoadBalancerConfig{}
+	cnf = &LoadBalancerYAMLConfiguration{}
 	if err := yaml.Unmarshal(*contents, cnf); err != nil {
 		log.Fatal(err)
 	}
-	return
-}
 
-func ValidateConfiguration(cnf *LoadBalancerConfig) (err error) {
-	if len(cnf.Balancers) < 1 {
-		return errors.New("No load balancers are configured")
+	balancersConfigCount := len(cnf.Balancers)
+	if balancersConfigCount > 0 {
+		for balancerId, balancerCnf := range cnf.Balancers {
+			// Check type field
+			if balancerCnf.Type == "" {
+				balancerCnf.Type = DefaultLoadBalancerType
+				log.Printf("Type field is not set for load balancer '%v'. Hence setting it to default '%v'", balancerId, DefaultLoadBalancerType)
+			}
+			if !IsValidBalancerType(balancerCnf.Type) {
+				log.Fatalf("Type field for load balancer '%v' is set to '%v', which is invalid. Supported types are : '%+v'", balancerId, balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
+			}
+
+			// Check Port field
+			if balancerCnf.Port == 0 {
+				log.Fatalf("Port field is not set for load balancer '%v'", balancerId)
+			}
+
+			// Check servers field
+			serversLen := len(balancerCnf.Servers)
+			if serversLen < 1 {
+				log.Fatalf("No redirection servers mentioned for load balancer '%v'", balancerId)
+			}
+		}
 	}
 
-	for name, lb := range cnf.Balancers {
-		fmt.Printf("Configuration for '%v' balancer is %+v\n", name, lb)
-	}
 	return
 }

@@ -3,21 +3,31 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 )
 
 type LoadBalancer struct {
+	name            string
 	port            string
 	roundRobinCount int
 	servers         []Server
 	IsRunning       bool
 }
 
-func NewLoadBalancer(port string) *LoadBalancer {
+var LoadBalancersPool map[string]*LoadBalancer
+
+func NewLoadBalancer(name, port string) *LoadBalancer {
 	return &LoadBalancer{
+		name:            name,
 		port:            port,
 		roundRobinCount: 0,
 	}
+}
+
+func (lb *LoadBalancer) Init(name, port string) {
+	lb.name = name
+	lb.port = port
 }
 
 func (lb *LoadBalancer) getNextAvailableServer() Server {
@@ -49,8 +59,22 @@ func (lb *LoadBalancer) Start() (err error) {
 		lb.serveProxy(rw, req)
 	}
 	http.HandleFunc("/", handleRedirect)
-	fmt.Printf("serving requests at 'localhost:%s'\n", lb.port)
+	log.Printf("Load balancer '%v' started listening to '%s'\n", lb.name, lb.port)
 	http.ListenAndServe(":"+lb.port, nil)
 	lb.IsRunning = true
 	return nil
+}
+
+func startLoadBalancers(cnf *LoadBalancerYAMLConfiguration) {
+	LoadBalancersPool = make(map[string]*LoadBalancer)
+	for Id, balancerCnf := range cnf.Balancers {
+
+		LoadBalancersPool[Id] = NewLoadBalancer(Id, fmt.Sprint(balancerCnf.Port))
+
+		for _, server := range balancerCnf.Servers {
+			LoadBalancersPool[Id].AddNewServer(NewSimpleServer(server.Address))
+		}
+
+		_ = LoadBalancersPool[Id].Start()
+	}
 }

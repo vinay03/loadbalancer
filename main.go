@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -17,17 +18,11 @@ func main() {
 	if len(os.Args) > 1 {
 		yamlConfigFile = os.Args[1]
 	}
-	_, err := LoadConfigFromFile(yamlConfigFile)
+	cnf, err := LoadConfigFromFile(yamlConfigFile)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 
-	// lb := NewLoadBalancer("8000")
-
-	// lb.AddNewServer(NewSimpleServer("http://localhost:8081"))
-	// lb.AddNewServer(NewSimpleServer("http://localhost:8082"))
-	// lb.AddNewServer(NewSimpleServer("http://localhost:8083"))
-
-	// // Start LoadBalancing
-	// _ = lb.Start()
+	// Start load balancers
+	startLoadBalancers(cnf)
 }
