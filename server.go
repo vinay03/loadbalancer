@@ -6,6 +6,12 @@ import (
 	"net/url"
 )
 
+type ProxyServer struct{}
+
+func (ps *ProxyServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+}
+
 type Server interface {
 	Address() string
 	IsAlive() bool

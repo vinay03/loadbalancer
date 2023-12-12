@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 )
 
 type LoadBalancer struct {
+	srv             http.Server
+	liveConnections sync.WaitGroup
 	name            string
 	port            string
 	roundRobinCount int
@@ -40,10 +43,17 @@ func (lb *LoadBalancer) getNextAvailableServer() Server {
 	return server
 }
 
+// http.Handler is a interface that expects ServeHTTP() function to be implemented.
+func (lb *LoadBalancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	lb.serveProxy(rw, req)
+}
+
 func (lb *LoadBalancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+	lb.liveConnections.Add(1)
 	targetServer := lb.getNextAvailableServer()
-	fmt.Printf("forwarding request to address %q\n", targetServer.Address())
+	fmt.Printf("Forwarding request to address %q\n", targetServer.Address())
 	targetServer.Serve(rw, req)
+	lb.liveConnections.Done()
 }
 
 func (lb *LoadBalancer) AddNewServer(server Server) {
@@ -55,20 +65,31 @@ func (lb *LoadBalancer) Start() (err error) {
 		err = errors.New("LoadBalancer is already running")
 		return
 	}
-	handleRedirect := func(rw http.ResponseWriter, req *http.Request) {
-		lb.serveProxy(rw, req)
-	}
-	http.HandleFunc("/", handleRedirect)
-	log.Printf("Load balancer '%v' started listening to '%s'\n", lb.name, lb.port)
-	http.ListenAndServe(":"+lb.port, nil)
-	lb.IsRunning = true
+
+	// srv := http.Server{}
+	lb.srv.Addr = ":" + lb.port
+	lb.srv.Handler = lb
+
+	go func(lb *LoadBalancer) {
+		log.Printf("Starting '%v' load balancer at '%v'\n", lb.name, lb.port)
+		lb.IsRunning = true
+		err := lb.srv.ListenAndServe()
+		// log.Println(err)
+		if err == http.ErrServerClosed {
+			lb.IsRunning = false
+			log.Printf("Load balancer '%v' is clsoed\n", lb.name)
+		} else if err != nil {
+			lb.IsRunning = false
+			log.Printf("Load balancer '%v' failed to start at '%s'. %v\n", lb.name, lb.port, err)
+		}
+	}(lb)
+
 	return nil
 }
 
 func startLoadBalancers(cnf *LoadBalancerYAMLConfiguration) {
 	LoadBalancersPool = make(map[string]*LoadBalancer)
 	for Id, balancerCnf := range cnf.Balancers {
-
 		LoadBalancersPool[Id] = NewLoadBalancer(Id, fmt.Sprint(balancerCnf.Port))
 
 		for _, server := range balancerCnf.Servers {
