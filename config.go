@@ -3,9 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"gopkg.in/yaml.v3"
 )
@@ -52,7 +53,7 @@ func LoadConfigFromFile(filepath string) (cnf *LoadBalancerYAMLConfiguration, er
 
 	f, err := os.ReadFile(filepath)
 	if err != nil {
-		log.Fatal(err)
+		log.Error().Err(err)
 	}
 
 	// Unmarshal YAML config into LoadBalancerYAMLConfiguration object
@@ -65,7 +66,7 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 	// var rawConfig map[string]interface{}
 	cnf = &LoadBalancerYAMLConfiguration{}
 	if err := yaml.Unmarshal(*contents, cnf); err != nil {
-		log.Fatal(err)
+		log.Error().Err(err)
 	}
 
 	// PrettyPrint(cnf.Balancers)
@@ -75,27 +76,27 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 		for _, balancerCnf := range cnf.Balancers {
 			// Check Name field
 			if balancerCnf.Name == "" {
-				log.Fatal("Name field is not set for load balancer.")
+				log.Error().Msg("Name field is not set for load balancer.")
 			}
 
 			// Check type field
 			if balancerCnf.Type == "" {
 				balancerCnf.Type = DefaultLoadBalancerType
-				log.Printf("Type field is not set for load balancer '%v'. Hence setting it to default '%v'", balancerCnf.Name, DefaultLoadBalancerType)
+				log.Info().Str("balancer", balancerCnf.Name).Msgf("Type field defaults to '%v'", DefaultLoadBalancerType)
 			}
 			if !IsValidBalancerType(balancerCnf.Type) {
-				log.Fatalf("Type field for load balancer '%v' is set to '%v', which is invalid. Supported types are : '%+v'", balancerCnf.Name, balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
+				log.Error().Str("balancer", balancerCnf.Name).Msgf("Type field is set to '%v', which is invalid. Supported types are : '%+v'", balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
 			}
 
 			// Check Port field
 			if balancerCnf.Port == 0 {
-				log.Fatalf("Port field is not set for load balancer '%v'", balancerCnf.Name)
+				log.Error().Str("balancer", balancerCnf.Name).Msg("Port field is not set")
 			}
 
 			// Check servers field
 			serversLen := len(balancerCnf.Servers)
 			if serversLen < 1 {
-				log.Fatalf("No redirection servers mentioned for load balancer '%v'", balancerCnf.Name)
+				log.Error().Str("balancer", balancerCnf.Name).Msg("No redirection servers mentioned")
 			}
 		}
 	}
