@@ -13,10 +13,11 @@ import (
 
 type LoadBalancerYAMLConfiguration struct {
 	Balancers []struct {
-		Name    string "yaml:name"
-		Type    string "yaml:type"
-		Port    int32  "yaml:port"
-		Servers []struct {
+		Name      string "yaml:name"
+		Type      string "yaml:type"
+		Port      int32  "yaml:port"
+		ApiPrefix string "yaml:apiprefix"
+		Servers   []struct {
 			Address string "yaml:address"
 			Weight  int32  "yaml:weight"
 		} "yaml:servers"
@@ -69,7 +70,7 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 		log.Error().Err(err)
 	}
 
-	// PrettyPrint(cnf.Balancers)
+	PrettyPrint(cnf.Balancers)
 
 	balancersConfigCount := len(cnf.Balancers)
 	if balancersConfigCount > 0 {

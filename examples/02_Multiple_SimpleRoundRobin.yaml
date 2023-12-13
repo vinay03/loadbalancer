@@ -2,20 +2,23 @@ balancers:
   - name: simple
     type: RoundRobin
     port: 8080
+    apiprefix: "/user"
     servers:
       - address: http://localhost:8081
       - address: http://localhost:8082
       - address: http://localhost:8083
   - name: secondsimple
     type: RoundRobin
-    port: 8090
+    port: 8080
+    apiprefix: "/orders"
     servers:
       - address: http://localhost:8084
       - address: http://localhost:8085
       - address: http://localhost:8086
   - name: thirdsimple
     type: RoundRobin
-    port: 8091
+    port: 8080
+    apiprefix: "/products"
     servers:
       - address: http://localhost:8084
       - address: http://localhost:8085
