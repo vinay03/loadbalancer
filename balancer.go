@@ -89,13 +89,13 @@ func (lb *LoadBalancer) Start() (err error) {
 
 func startLoadBalancers(cnf *LoadBalancerYAMLConfiguration) {
 	LoadBalancersPool = make(map[string]*LoadBalancer)
-	for Id, balancerCnf := range cnf.Balancers {
-		LoadBalancersPool[Id] = NewLoadBalancer(Id, fmt.Sprint(balancerCnf.Port))
+	for _, balancerCnf := range cnf.Balancers {
+		LoadBalancersPool[balancerCnf.Name] = NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
 
 		for _, server := range balancerCnf.Servers {
-			LoadBalancersPool[Id].AddNewServer(NewSimpleServer(server.Address))
+			LoadBalancersPool[balancerCnf.Name].AddNewServer(NewSimpleServer(server.Address))
 		}
 
-		_ = LoadBalancersPool[Id].Start()
+		_ = LoadBalancersPool[balancerCnf.Name].Start()
 	}
 }

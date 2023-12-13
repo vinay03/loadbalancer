@@ -1,5 +1,5 @@
 balancers:
-  simple:
+  - name: simple
     type: RoundRobin
     port: 8080
     servers:
