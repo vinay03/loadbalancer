@@ -11,7 +11,8 @@ import (
 )
 
 type LoadBalancerYAMLConfiguration struct {
-	Balancers map[string]struct {
+	Balancers []struct {
+		Name    string "yaml:name"
 		Type    string "yaml:type"
 		Port    int32  "yaml:port"
 		Servers []struct {
@@ -67,27 +68,34 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 		log.Fatal(err)
 	}
 
+	// PrettyPrint(cnf.Balancers)
+
 	balancersConfigCount := len(cnf.Balancers)
 	if balancersConfigCount > 0 {
-		for balancerId, balancerCnf := range cnf.Balancers {
+		for _, balancerCnf := range cnf.Balancers {
+			// Check Name field
+			if balancerCnf.Name == "" {
+				log.Fatal("Name field is not set for load balancer.")
+			}
+
 			// Check type field
 			if balancerCnf.Type == "" {
 				balancerCnf.Type = DefaultLoadBalancerType
-				log.Printf("Type field is not set for load balancer '%v'. Hence setting it to default '%v'", balancerId, DefaultLoadBalancerType)
+				log.Printf("Type field is not set for load balancer '%v'. Hence setting it to default '%v'", balancerCnf.Name, DefaultLoadBalancerType)
 			}
 			if !IsValidBalancerType(balancerCnf.Type) {
-				log.Fatalf("Type field for load balancer '%v' is set to '%v', which is invalid. Supported types are : '%+v'", balancerId, balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
+				log.Fatalf("Type field for load balancer '%v' is set to '%v', which is invalid. Supported types are : '%+v'", balancerCnf.Name, balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
 			}
 
 			// Check Port field
 			if balancerCnf.Port == 0 {
-				log.Fatalf("Port field is not set for load balancer '%v'", balancerId)
+				log.Fatalf("Port field is not set for load balancer '%v'", balancerCnf.Name)
 			}
 
 			// Check servers field
 			serversLen := len(balancerCnf.Servers)
 			if serversLen < 1 {
-				log.Fatalf("No redirection servers mentioned for load balancer '%v'", balancerId)
+				log.Fatalf("No redirection servers mentioned for load balancer '%v'", balancerCnf.Name)
 			}
 		}
 	}

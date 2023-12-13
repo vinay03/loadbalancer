@@ -1,19 +1,19 @@
 balancers:
-  simple:
+  - name: simple
     type: RoundRobin
     port: 8080
     servers:
       - address: http://localhost:8081
       - address: http://localhost:8082
       - address: http://localhost:8083
-  secondsimple:
+  - name: secondsimple
     type: RoundRobin
     port: 8090
     servers:
       - address: http://localhost:8084
       - address: http://localhost:8085
       - address: http://localhost:8086
-  thirdsimple:
+  - name: thirdsimple
     type: RoundRobin
     port: 8091
     servers:
