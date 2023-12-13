@@ -3,9 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type LoadBalancer struct {
@@ -51,7 +52,7 @@ func (lb *LoadBalancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (lb *LoadBalancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	lb.liveConnections.Add(1)
 	targetServer := lb.getNextAvailableServer()
-	fmt.Printf("Forwarding request to address %q\n", targetServer.Address())
+	log.Debug().Str("balancer", lb.name).Str("to", targetServer.Address()).Str("api", req.RequestURI).Msg("Forwarding request")
 	targetServer.Serve(rw, req)
 	lb.liveConnections.Done()
 }
@@ -71,16 +72,15 @@ func (lb *LoadBalancer) Start() (err error) {
 	lb.srv.Handler = lb
 
 	go func(lb *LoadBalancer) {
-		log.Printf("Starting '%v' load balancer at '%v'\n", lb.name, lb.port)
+		log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Starting Load Balancer")
 		lb.IsRunning = true
 		err := lb.srv.ListenAndServe()
-		// log.Println(err)
 		if err == http.ErrServerClosed {
 			lb.IsRunning = false
-			log.Printf("Load balancer '%v' is clsoed\n", lb.name)
+			log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Load Balancer stopped")
 		} else if err != nil {
 			lb.IsRunning = false
-			log.Printf("Load balancer '%v' failed to start at '%s'. %v\n", lb.name, lb.port, err)
+			log.Info().Str("balancer", lb.name).Str("port", lb.port).Err(err).Msg("Load Balancer failed to start.")
 		}
 	}(lb)
 
