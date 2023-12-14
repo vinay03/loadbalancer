@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var DebugMode bool
+
 func handleErr(err error) {
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -25,10 +27,11 @@ func handleErr(err error) {
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	debug := flag.Bool("debug", false, "Sets log level to debug")
+	DebugMode = *debug
 
 	flag.Parse()
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	if *debug {
+	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	if DebugMode {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
@@ -42,8 +45,6 @@ func main() {
 	if err != nil {
 		log.Error().Err(err)
 	}
-
-	log.Log()
 
 	// Start load balancers
 	startLoadBalancers(cnf)
