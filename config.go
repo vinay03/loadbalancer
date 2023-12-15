@@ -15,7 +15,7 @@ type LoadBalancerYAMLConfiguration struct {
 	Balancers []struct {
 		Name      string "yaml:name"
 		Type      string "yaml:type"
-		Port      int32  "yaml:port"
+		Port      string "yaml:port"
 		ApiPrefix string "yaml:apiprefix"
 		Servers   []struct {
 			Address string "yaml:address"
@@ -25,6 +25,7 @@ type LoadBalancerYAMLConfiguration struct {
 }
 
 var DefaultLoadBalancerType string = "RoundRobin"
+var DefaultApiPrefix string = "/"
 
 var supportedBalancers []string = []string{
 	"RoundRobin",
@@ -92,7 +93,7 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 			}
 
 			// Check Port field
-			if balancerCnf.Port == 0 {
+			if balancerCnf.Port == "" {
 				log.Error().Str("balancer", balancerCnf.Name).Msg("Port field is not set")
 			}
 
@@ -101,6 +102,14 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 			if serversLen < 1 {
 				log.Error().Str("balancer", balancerCnf.Name).Msg("No redirection servers mentioned")
 			}
+
+			// Check apiprefix field
+			apiprefixLen := len(balancerCnf.ApiPrefix)
+			if apiprefixLen < 1 {
+				log.Info().Str("balancer", balancerCnf.Name).Msg("`apiprefix` field not specified. Set to '/' by default.")
+				balancerCnf.ApiPrefix = DefaultApiPrefix
+			}
+
 		}
 	}
 

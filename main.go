@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"time"
@@ -9,6 +8,7 @@ import (
 	// "log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/rs/zerolog"
@@ -65,9 +65,9 @@ func main() {
 	select {
 	case <-done:
 		log.Info().Msg("Shutting down gracefully...")
-		for _, balancerCnf := range LoadBalancersPool {
-			balancerCnf.liveConnections.Wait()
-			balancerCnf.srv.Shutdown(context.Background())
+		serversSync := &sync.WaitGroup{}
+		for _, lbServer := range LoadBalancerServersPool {
+			lbServer.Shutdown(serversSync)
 		}
 	}
 }

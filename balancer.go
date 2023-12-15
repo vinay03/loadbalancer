@@ -1,13 +1,22 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
 
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )
+
+type LoadBalancerServer struct {
+	srv       http.Server
+	port      string
+	router    *mux.Router
+	balancers []*LoadBalancer
+	IsRunning bool
+}
 
 type LoadBalancer struct {
 	srv             http.Server
@@ -16,10 +25,10 @@ type LoadBalancer struct {
 	port            string
 	roundRobinCount int
 	servers         []Server
-	IsRunning       bool
 }
 
 var LoadBalancersPool map[string]*LoadBalancer
+var LoadBalancerServersPool map[string]*LoadBalancerServer
 
 func NewLoadBalancer(name, port string) *LoadBalancer {
 	return &LoadBalancer{
@@ -27,11 +36,6 @@ func NewLoadBalancer(name, port string) *LoadBalancer {
 		port:            port,
 		roundRobinCount: 0,
 	}
-}
-
-func (lb *LoadBalancer) Init(name, port string) {
-	lb.name = name
-	lb.port = port
 }
 
 func (lb *LoadBalancer) getNextAvailableServer() Server {
@@ -61,41 +65,80 @@ func (lb *LoadBalancer) AddNewServer(server Server) {
 	lb.servers = append(lb.servers, server)
 }
 
-func (lb *LoadBalancer) Start() (err error) {
-	if lb.IsRunning {
-		err = errors.New("LoadBalancer is already running")
-		return
+func (lbs *LoadBalancerServer) Shutdown(serversSync *sync.WaitGroup) {
+	log.Info().Str("port", lbs.port).Msg("Stopping server listening at :" + lbs.port)
+	serversSync.Add(len(lbs.balancers))
+	for _, balancerCnf := range lbs.balancers {
+		go func(serversSync *sync.WaitGroup, balancerCnf *LoadBalancer) {
+			balancerCnf.liveConnections.Wait()
+			balancerCnf.srv.Shutdown(context.Background())
+			serversSync.Done()
+		}(serversSync, balancerCnf)
 	}
+}
+func (lbs *LoadBalancerServer) Start() (err error) {
+	// if lbs.IsRunning {
+	// 	err = errors.New("LoadBalancer server is already running")
+	// 	return
+	// }
 
 	// srv := http.Server{}
-	lb.srv.Addr = ":" + lb.port
-	lb.srv.Handler = lb
+	// lb.srv.Addr = ":" + lb.port
+	// lb.srv.Handler = lb
 
-	go func(lb *LoadBalancer) {
-		log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Starting Load Balancer")
-		lb.IsRunning = true
-		err := lb.srv.ListenAndServe()
+	lbs.srv.Handler = lbs.router
+
+	go func(lbs *LoadBalancerServer) {
+		log.Info().Str("port", lbs.port).Msg("Starting Load Balancer Server")
+		// lbs.IsRunning = true
+		err := lbs.srv.ListenAndServe()
 		if err == http.ErrServerClosed {
-			lb.IsRunning = false
-			log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Load Balancer stopped")
+			// lb.IsRunning = false
+			log.Info().Str("port", lbs.port).Msg("Load Balancer server stopped")
 		} else if err != nil {
-			lb.IsRunning = false
-			log.Info().Str("balancer", lb.name).Str("port", lb.port).Err(err).Msg("Load Balancer failed to start.")
+			// lb.IsRunning = false
+			log.Info().Str("port", lbs.port).Err(err).Msg("Load Balancer server failed to start.")
 		}
-	}(lb)
+	}(lbs)
 
 	return nil
 }
 
 func startLoadBalancers(cnf *LoadBalancerYAMLConfiguration) {
 	LoadBalancersPool = make(map[string]*LoadBalancer)
-	for _, balancerCnf := range cnf.Balancers {
-		LoadBalancersPool[balancerCnf.Name] = NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
+	LoadBalancerServersPool = make(map[string]*LoadBalancerServer)
 
-		for _, server := range balancerCnf.Servers {
-			LoadBalancersPool[balancerCnf.Name].AddNewServer(NewSimpleServer(server.Address))
+	for _, balancerCnf := range cnf.Balancers {
+		var lbsrv *LoadBalancerServer
+		var ok bool
+		lbsrv, ok = LoadBalancerServersPool[balancerCnf.Port]
+		if !ok {
+			lbsrv = &LoadBalancerServer{
+				port:   balancerCnf.Port,
+				router: mux.NewRouter(),
+				srv: http.Server{
+					Addr: ":" + balancerCnf.Port,
+				},
+			}
+			LoadBalancerServersPool[balancerCnf.Port] = lbsrv
 		}
 
-		_ = LoadBalancersPool[balancerCnf.Name].Start()
+		lbalancer := NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
+
+		for _, server := range balancerCnf.Servers {
+			lbalancer.AddNewServer(NewSimpleServer(server.Address))
+		}
+
+		// _ = lbalancer.Start()
+
+		lbsrv.router.HandleFunc(balancerCnf.ApiPrefix, lbalancer.serveProxy)
+
+		LoadBalancersPool[balancerCnf.Name] = lbalancer
+		lbsrv.balancers = append(lbsrv.balancers, lbalancer)
+	}
+
+	// start all servers
+	for _, lbServer := range LoadBalancerServersPool {
+		lbServer.Start()
 	}
 }

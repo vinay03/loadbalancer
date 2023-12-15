@@ -2,7 +2,7 @@ balancers:
   - name: simple
     type: RoundRobin
     port: 8080
-    apiprefix: "/user"
+    apiprefix: "/"
     servers:
       - address: http://localhost:8081
       - address: http://localhost:8082
@@ -23,3 +23,11 @@ balancers:
       - address: http://localhost:8084
       - address: http://localhost:8085
       - address: http://localhost:8086
+  - name: fourthsimple
+    type: RoundRobin
+    port: 8090
+    apiprefix: "/"
+    servers:
+      - address: http://localhost:8081
+      - address: http://localhost:8083
+      - address: http://localhost:8085
