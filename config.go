@@ -70,7 +70,9 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 		log.Error().Err(err)
 	}
 
-	PrettyPrint(cnf.Balancers)
+	if DebugMode {
+		log.Info().Msg("Configuration from YAML: " + PrettyPrint(cnf.Balancers))
+	}
 
 	balancersConfigCount := len(cnf.Balancers)
 	if balancersConfigCount > 0 {

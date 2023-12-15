@@ -16,6 +16,7 @@ import (
 )
 
 var DebugMode bool
+var YAMLConfigFilePath string
 
 func handleErr(err error) {
 	if err != nil {
@@ -24,12 +25,25 @@ func handleErr(err error) {
 	}
 }
 
-func main() {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+func loadFlags() {
 	debug := flag.Bool("debug", false, "Sets log level to debug")
-	DebugMode = *debug
+	configFile := flag.String("config", "", "Path to YAML config file.")
 
 	flag.Parse()
+
+	// Load Debug flag
+	DebugMode = *debug
+
+	// Load config file path
+	YAMLConfigFilePath = *configFile
+}
+
+func main() {
+	// Process CLI flags
+	loadFlags()
+
+	// Initialize Logger
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	if DebugMode {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
@@ -37,11 +51,8 @@ func main() {
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
-	var yamlConfigFilePath string
-	if len(os.Args) > 1 {
-		yamlConfigFilePath = os.Args[1]
-	}
-	cnf, err := LoadConfigFromFile(yamlConfigFilePath)
+	// Process YAML config file
+	cnf, err := LoadConfigFromFile(YAMLConfigFilePath)
 	if err != nil {
 		log.Error().Err(err)
 	}
