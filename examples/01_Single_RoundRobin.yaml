@@ -2,7 +2,7 @@ balancers:
   - name: simple
     type: RoundRobin
     port: 8080
-    apiprefix: "/"
+    apiprefix: "/health"
     servers:
       - address: http://localhost:8081
       - address: http://localhost:8082

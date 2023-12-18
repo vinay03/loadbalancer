@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ProxyServer struct{}
@@ -25,7 +28,10 @@ type simpleServer struct {
 
 func NewSimpleServer(addr string) *simpleServer {
 	serverUrl, err := url.Parse(addr)
-	handleErr(err)
+	if err != nil {
+		log.Fatal().Msg("Error occured while parsing node url")
+		os.Exit(1)
+	}
 
 	return &simpleServer{
 		addr:  addr,

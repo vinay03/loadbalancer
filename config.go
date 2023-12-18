@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 
 	"gopkg.in/yaml.v3"
@@ -24,14 +26,20 @@ type LoadBalancerYAMLConfiguration struct {
 	} "yaml:balancers"
 }
 
-var DefaultLoadBalancerType string = "RoundRobin"
-var DefaultApiPrefix string = "/"
+const (
+	LB_TYPE_ROUNDROBIN          = "RoundRobin"
+	LB_TYPE_WEIGHTED_ROUNDROBIN = "WeightedRoundRobin"
+	LB_TYPE_PERFORMANCE_BASED   = "PerformanceBased"
+)
 
 var supportedBalancers []string = []string{
-	"RoundRobin",
-	"WeightedRoundRobin",
-	"PerformanceBased",
+	LB_TYPE_ROUNDROBIN,
+	LB_TYPE_WEIGHTED_ROUNDROBIN,
+	LB_TYPE_PERFORMANCE_BASED,
 }
+
+var DefaultLoadBalancerType string = LB_TYPE_ROUNDROBIN
+var DefaultApiPrefix string = "/"
 
 func IsValidBalancerType(searchType string) (isValid bool) {
 	for _, v := range supportedBalancers {
@@ -64,15 +72,17 @@ func LoadConfigFromFile(filepath string) (cnf *LoadBalancerYAMLConfiguration, er
 	return
 }
 
+func loadConfigFromString(fileContents string) (cnf *LoadBalancerYAMLConfiguration, err error) {
+	fConts := []byte(fileContents)
+	cnf = UnmarshalYAML(&fConts)
+	return
+}
+
 func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 	// var rawConfig map[string]interface{}
 	cnf = &LoadBalancerYAMLConfiguration{}
 	if err := yaml.Unmarshal(*contents, cnf); err != nil {
 		log.Error().Err(err)
-	}
-
-	if DebugMode {
-		log.Info().Msg("Configuration from YAML: " + PrettyPrint(cnf.Balancers))
 	}
 
 	balancersConfigCount := len(cnf.Balancers)
@@ -114,4 +124,43 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 	}
 
 	return
+}
+
+func (cnf *LoadBalancerYAMLConfiguration) Initialize() {
+	LoadBalancersPool = make(map[string]*LoadBalancer)
+	LoadBalancerServersPool = make(map[string]*LoadBalancerServer)
+
+	for _, balancerCnf := range cnf.Balancers {
+		var lbsrv *LoadBalancerServer
+		var ok bool
+		lbsrv, ok = LoadBalancerServersPool[balancerCnf.Port]
+		if !ok {
+			lbsrv = &LoadBalancerServer{
+				port:   balancerCnf.Port,
+				router: mux.NewRouter(),
+				srv: http.Server{
+					Addr: ":" + balancerCnf.Port,
+				},
+			}
+			LoadBalancerServersPool[balancerCnf.Port] = lbsrv
+		}
+
+		lbalancer := NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
+
+		for _, server := range balancerCnf.Servers {
+			lbalancer.AddNewServer(NewSimpleServer(server.Address))
+		}
+
+		// _ = lbalancer.Start()
+
+		lbsrv.router.HandleFunc(balancerCnf.ApiPrefix, lbalancer.serveProxy)
+
+		LoadBalancersPool[balancerCnf.Name] = lbalancer
+		lbsrv.balancers = append(lbsrv.balancers, lbalancer)
+	}
+
+	// start all servers
+	for _, lbServer := range LoadBalancerServersPool {
+		lbServer.Start()
+	}
 }
