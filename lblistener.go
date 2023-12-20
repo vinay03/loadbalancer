@@ -52,19 +52,20 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 		Msg("Stopping listener at :" + lbs.Port)
 
 	// Count Balancers
-	serversSync.Add(len(lbs.Balancers))
+	balancersSync := &sync.WaitGroup{}
+	balancersSync.Add(len(lbs.Balancers))
 
 	for _, balancer := range lbs.Balancers {
-		go func(serversSync *sync.WaitGroup, balancer *Balancer) {
+		go func(balancersSync *sync.WaitGroup, balancer *Balancer) {
 			log.Debug().Str("id", balancer.Id).Msg("Closing Load Balancer")
 			balancer.State = LB_STATE_CLOSING
 			balancer.liveConnections.Wait()
 			balancer.State = LB_STATE_CLOSED
-			serversSync.Done()
+			balancersSync.Done()
 			log.Debug().Str("id", balancer.Id).Msg("Load Balancer Closed")
-		}(serversSync, balancer)
+		}(balancersSync, balancer)
 	}
-	serversSync.Wait()
+	balancersSync.Wait()
 
 	lbs.IsRunning = false
 
@@ -72,6 +73,8 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 		Str("port", lbs.Port).
 		Str("protocol", lbs.Protocol).
 		Msg("Listener stopped")
+
+	serversSync.Done()
 }
 
 func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {

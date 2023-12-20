@@ -71,10 +71,6 @@ func (lbs *LoadBalancerService) SetParams(config *LoadBalancerServiceParams) {
 			log.Error().Err(err)
 		}
 	}
-
-	// if lbs.Params.DebugMode {
-	// 	log.Info().Msg("Configuration loaded: " + PrettyPrint(lbs.Config))
-	// }
 }
 
 func (lbs *LoadBalancerService) Apply() {
@@ -114,7 +110,12 @@ func (lbs *LoadBalancerService) Apply() {
 func (lbs *LoadBalancerService) Stop() {
 	log.Info().Msg("Triggered shudown procedure for Load Balancer Service...")
 	serversSync := &sync.WaitGroup{}
+	serversSync.Add(len(lbs.Listeners))
 	for _, listener := range lbs.Listeners {
-		listener.Shutdown(serversSync)
+		go func(serversSync *sync.WaitGroup, listener *Listener) {
+			listener.Shutdown(serversSync)
+		}(serversSync, listener)
 	}
+	serversSync.Wait()
+	log.Info().Msg("Load Balancer service shudown completed")
 }
