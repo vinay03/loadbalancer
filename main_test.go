@@ -25,7 +25,7 @@ func Test_Sample(t *testing.T) {
 	}
 
 	LbService.SetParams(config)
-	LbService.Start()
+	LbService.Apply()
 
 	serverPort := "8080"
 
