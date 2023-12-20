@@ -1,101 +1,63 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 )
 
-type LoadBalancer struct {
-	srv             http.Server
+type LB_STATE int
+
+const (
+	LB_STATE_INIT    LB_STATE = 0
+	LB_STATE_ACTIVE  LB_STATE = 1
+	LB_STATE_CLOSING LB_STATE = 2
+	LB_STATE_CLOSED  LB_STATE = 3
+)
+
+type Balancer struct {
+	// srv             http.Server
 	liveConnections sync.WaitGroup
-	name            string
-	port            string
+	Id              string
+	Mode            string
+	RoutePrefix     string
+	// port            string
 	roundRobinCount int
-	servers         []Server
-	IsRunning       bool
+	Targets         []*Target
+	State           LB_STATE
 }
 
-var LoadBalancersPool map[string]*LoadBalancer
+var LoadBalancersPool map[string]*Balancer
 
-func NewLoadBalancer(name, port string) *LoadBalancer {
-	return &LoadBalancer{
-		name:            name,
-		port:            port,
-		roundRobinCount: 0,
-	}
-}
-
-func (lb *LoadBalancer) Init(name, port string) {
-	lb.name = name
-	lb.port = port
-}
-
-func (lb *LoadBalancer) getNextAvailableServer() Server {
-	server := lb.servers[lb.roundRobinCount%len(lb.servers)]
-	for !server.IsAlive() {
+func (lb *Balancer) getNextAvailableServer() *Target {
+	target := lb.Targets[lb.roundRobinCount%len(lb.Targets)]
+	for !target.IsAlive() {
 		lb.roundRobinCount++
-		server = lb.servers[lb.roundRobinCount%len(lb.servers)]
+		target = lb.Targets[lb.roundRobinCount%len(lb.Targets)]
 	}
 	lb.roundRobinCount++
-	return server
+	return target
 }
 
 // http.Handler is a interface that expects ServeHTTP() function to be implemented.
-func (lb *LoadBalancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	lb.serveProxy(rw, req)
-}
+// func (lb *Balancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+// 	lb.serveProxy(rw, req)
+// }
 
-func (lb *LoadBalancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+	target := lb.getNextAvailableServer()
+	log.Debug().
+		Str("uri", req.RequestURI).
+		Str("balancer", lb.Id).
+		Str("to", target.Address()).
+		Msg("Forwarding request")
+
 	lb.liveConnections.Add(1)
-	targetServer := lb.getNextAvailableServer()
-	log.Debug().Str("balancer", lb.name).Str("to", targetServer.Address()).Str("api", req.RequestURI).Msg("Forwarding request")
-	targetServer.Serve(rw, req)
+	target.Serve(rw, req)
 	lb.liveConnections.Done()
 }
 
-func (lb *LoadBalancer) AddNewServer(server Server) {
-	lb.servers = append(lb.servers, server)
-}
-
-func (lb *LoadBalancer) Start() (err error) {
-	if lb.IsRunning {
-		err = errors.New("LoadBalancer is already running")
-		return
-	}
-
-	// srv := http.Server{}
-	lb.srv.Addr = ":" + lb.port
-	lb.srv.Handler = lb
-
-	go func(lb *LoadBalancer) {
-		log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Starting Load Balancer")
-		lb.IsRunning = true
-		err := lb.srv.ListenAndServe()
-		if err == http.ErrServerClosed {
-			lb.IsRunning = false
-			log.Info().Str("balancer", lb.name).Str("port", lb.port).Msg("Load Balancer stopped")
-		} else if err != nil {
-			lb.IsRunning = false
-			log.Info().Str("balancer", lb.name).Str("port", lb.port).Err(err).Msg("Load Balancer failed to start.")
-		}
-	}(lb)
-
-	return nil
-}
-
-func startLoadBalancers(cnf *LoadBalancerYAMLConfiguration) {
-	LoadBalancersPool = make(map[string]*LoadBalancer)
-	for _, balancerCnf := range cnf.Balancers {
-		LoadBalancersPool[balancerCnf.Name] = NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
-
-		for _, server := range balancerCnf.Servers {
-			LoadBalancersPool[balancerCnf.Name].AddNewServer(NewSimpleServer(server.Address))
-		}
-
-		_ = LoadBalancersPool[balancerCnf.Name].Start()
-	}
+func (lb *Balancer) AddNewServer(addr string) {
+	lb.Targets = append(lb.Targets, NewTarget(addr))
 }

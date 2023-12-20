@@ -2,13 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 )
 
-func PrettyPrint(anyData interface{}) {
+func PrettyPrint(anyData interface{}) string {
 	b, err := json.MarshalIndent(anyData, "", "  ")
 	if err != nil {
-		log.Println(err)
+		return err.Error()
 	}
-	log.Println(string(b))
+	return string(b)
 }
