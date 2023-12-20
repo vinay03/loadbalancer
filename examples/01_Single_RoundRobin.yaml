@@ -1,9 +1,38 @@
-balancers:
-  - name: simple
-    type: RoundRobin
+listeners:
+  - protocol: http
     port: 8080
-    apiprefix: "/health"
-    servers:
-      - address: http://localhost:8081
-      - address: http://localhost:8082
-      - address: http://localhost:8083
+    ssl_certificate: test-value
+    ssl_certificate_key: test-value
+    routes:
+      - routeprefix: "/"
+        id: "root-default"
+        mode: "RoundRobin"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
+      - routeprefix: "/orders"
+        id: "orders"
+        mode: "RoundRobin"
+        targets: 
+          - address: http://localhost:8092
+          - address: http://localhost:8094
+          - address: http://localhost:8096
+      - routeprefix: "/health"
+        id: "health"
+        mode: "RoundRobin"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8093
+          - address: http://localhost:8095
+  - protocol: http
+    port: 8081
+    ssl_certificate:
+    ssl_certificate_key:
+    routes:
+      - routeprefix: "/"
+        id: "secondary-root"
+        mode: "RoundRobin"
+        targets:
+          - address: http://localhost:8091
+          - address: http://localhost:8096
