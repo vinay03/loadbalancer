@@ -7,48 +7,57 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type LoadBalancer struct {
-	srv             http.Server
+type LB_STATE int
+
+const (
+	LB_STATE_INIT    LB_STATE = 0
+	LB_STATE_ACTIVE  LB_STATE = 1
+	LB_STATE_CLOSING LB_STATE = 2
+	LB_STATE_CLOSED  LB_STATE = 3
+)
+
+type Balancer struct {
+	// srv             http.Server
 	liveConnections sync.WaitGroup
-	name            string
-	port            string
+	Id              string
+	Mode            string
+	RoutePrefix     string
+	// port            string
 	roundRobinCount int
-	servers         []Server
+	Targets         []*Target
+	State           LB_STATE
 }
 
-var LoadBalancersPool map[string]*LoadBalancer
+var LoadBalancersPool map[string]*Balancer
 
-func NewLoadBalancer(name, port string) *LoadBalancer {
-	return &LoadBalancer{
-		name:            name,
-		port:            port,
-		roundRobinCount: 0,
-	}
-}
-
-func (lb *LoadBalancer) getNextAvailableServer() Server {
-	server := lb.servers[lb.roundRobinCount%len(lb.servers)]
-	for !server.IsAlive() {
+func (lb *Balancer) getNextAvailableServer() *Target {
+	target := lb.Targets[lb.roundRobinCount%len(lb.Targets)]
+	for !target.IsAlive() {
 		lb.roundRobinCount++
-		server = lb.servers[lb.roundRobinCount%len(lb.servers)]
+		target = lb.Targets[lb.roundRobinCount%len(lb.Targets)]
 	}
 	lb.roundRobinCount++
-	return server
+	return target
 }
 
 // http.Handler is a interface that expects ServeHTTP() function to be implemented.
-// func (lb *LoadBalancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+// func (lb *Balancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // 	lb.serveProxy(rw, req)
 // }
 
-func (lb *LoadBalancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+	target := lb.getNextAvailableServer()
+	log.Debug().
+		Str("uri", req.RequestURI).
+		Str("balancer", lb.Id).
+		Str("to", target.Address()).
+		Msg("Forwarding request")
+
 	lb.liveConnections.Add(1)
-	targetServer := lb.getNextAvailableServer()
-	log.Debug().Str("balancer", lb.name).Str("to", targetServer.Address()).Str("api", req.RequestURI).Msg("Forwarding request")
-	targetServer.Serve(rw, req)
+	target.Serve(rw, req)
 	lb.liveConnections.Done()
 }
 
-func (lb *LoadBalancer) AddNewServer(server Server) {
-	lb.servers = append(lb.servers, server)
+func (lb *Balancer) AddNewServer(addr string) {
+	lb.Targets = append(lb.Targets, NewTarget(addr))
 }

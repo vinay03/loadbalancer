@@ -16,8 +16,7 @@ func main() {
 
 	LbService.SetParams(loadFlags())
 
-	// Start load balancers
-	LbService.Start()
+	LbService.Apply()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)

@@ -9,43 +9,30 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ProxyServer struct{}
-
-func (ps *ProxyServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-
-}
-
-type Server interface {
-	Address() string
-	IsAlive() bool
-	Serve(rw http.ResponseWriter, r *http.Request)
-}
-
-type simpleServer struct {
+type Target struct {
 	addr  string
 	proxy *httputil.ReverseProxy
 }
 
-func NewSimpleServer(addr string) *simpleServer {
+func NewTarget(addr string) *Target {
 	serverUrl, err := url.Parse(addr)
 	if err != nil {
 		log.Fatal().Msg("Error occured while parsing node url")
 		os.Exit(1)
 	}
-
-	return &simpleServer{
+	return &Target{
 		addr:  addr,
 		proxy: httputil.NewSingleHostReverseProxy(serverUrl),
 	}
 }
 
-func (s *simpleServer) Address() string {
+func (s *Target) Address() string {
 	return s.addr
 }
 
-func (s *simpleServer) IsAlive() bool {
+func (s *Target) IsAlive() bool {
 	return true
 }
-func (s *simpleServer) Serve(rw http.ResponseWriter, req *http.Request) {
+func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) {
 	s.proxy.ServeHTTP(rw, req)
 }

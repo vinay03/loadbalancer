@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -11,11 +12,11 @@ import (
 )
 
 type LoadBalancerService struct {
-	Params                 *LoadBalancerServiceParams
-	Config                 *LoadBalancerYAMLConfiguration
-	Servers                map[string]*LoadBalancerServer
-	BalancersNameReference map[string]*LoadBalancer
-	State                  string
+	Params               *LoadBalancerServiceParams
+	Config               *LoadBalancerYAMLConfiguration
+	Listeners            []*Listener
+	BalancersIdReference map[string]*Balancer
+	State                string
 }
 
 type LoadBalancerServiceParams struct {
@@ -71,17 +72,49 @@ func (lbs *LoadBalancerService) SetParams(config *LoadBalancerServiceParams) {
 		}
 	}
 
-	if lbs.Params.DebugMode {
-		log.Info().Msg("Configuration loaded: " + PrettyPrint(lbs.Config))
+	// if lbs.Params.DebugMode {
+	// 	log.Info().Msg("Configuration loaded: " + PrettyPrint(lbs.Config))
+	// }
+}
+
+func (lbs *LoadBalancerService) Apply() {
+	lbs.BalancersIdReference = make(map[string]*Balancer)
+	for _, listenerCnf := range lbs.Config.Listeners {
+		lbListener := Listener{
+			Port:     listenerCnf.Port,
+			Protocol: listenerCnf.Protocol,
+			Srv: http.Server{
+				Addr: ":" + listenerCnf.Port,
+			},
+		}
+
+		for _, route := range listenerCnf.Routes {
+			lbalancer := &Balancer{
+				Id:          route.Id,
+				Mode:        route.Mode,
+				RoutePrefix: route.Routeprefix,
+			}
+			for _, target := range route.Targets {
+				lbalancer.AddNewServer(target.Address)
+			}
+
+			lbListener.Balancers = append(lbListener.Balancers, lbalancer)
+			lbs.BalancersIdReference[route.Id] = lbalancer
+		}
+		lbs.Listeners = append(lbs.Listeners, &lbListener)
+		lbListener.Srv.Handler = lbListener.GetListenerHandler()
+	}
+
+	// start all listeners
+	for _, lblistener := range lbs.Listeners {
+		lblistener.Start()
 	}
 }
-func (lbs *LoadBalancerService) Start() {
-	lbs.Config.Initialize()
-}
+
 func (lbs *LoadBalancerService) Stop() {
-	log.Info().Msg("Stopping Load Balancers Service...")
+	log.Info().Msg("Triggered shudown procedure for Load Balancer Service...")
 	serversSync := &sync.WaitGroup{}
-	for _, lbServer := range LoadBalancerServersPool {
-		lbServer.Shutdown(serversSync)
+	for _, listener := range lbs.Listeners {
+		listener.Shutdown(serversSync)
 	}
 }
