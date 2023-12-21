@@ -45,6 +45,10 @@ func (lb *Balancer) getNextAvailableServer() *Target {
 // 	lb.serveProxy(rw, req)
 // }
 
+func (lb *Balancer) IsAvailable() bool {
+	return lb.State == LB_STATE_ACTIVE
+}
+
 func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	target := lb.getNextAvailableServer()
 	log.Debug().
@@ -58,6 +62,13 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	lb.liveConnections.Done()
 }
 
+func (lb *Balancer) UpdateState() {
+	if len(lb.Targets) > 0 {
+		lb.State = LB_STATE_ACTIVE
+	}
+}
+
 func (lb *Balancer) AddNewServer(addr string) {
 	lb.Targets = append(lb.Targets, NewTarget(addr))
+	lb.UpdateState()
 }

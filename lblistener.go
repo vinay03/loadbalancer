@@ -9,6 +9,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type LISTENER_STATE int
+
+const (
+	LISTENER_STATE_INIT    LISTENER_STATE = 0
+	LISTENER_STATE_ACTIVE  LISTENER_STATE = 1
+	LISTENER_STATE_CLOSING LISTENER_STATE = 2
+	LISTENER_STATE_CLOSED  LISTENER_STATE = 3
+)
+
 type Listener struct {
 	Srv               http.Server
 	Port              string
@@ -16,13 +25,14 @@ type Listener struct {
 	SSLCertificate    string
 	SSLCertificateKey string
 	Balancers         []*Balancer
-	IsRunning         bool
+	State             LISTENER_STATE
+	// IsRunning         bool
 }
 
 // var LoadBalancerListenersPool map[string]*LoadBalancerListener
 
 func (lbs *Listener) Start() (err error) {
-	if lbs.IsRunning {
+	if lbs.State != LISTENER_STATE_INIT {
 		err = errors.New("LoadBalancer server is already running")
 		return
 	}
@@ -31,13 +41,13 @@ func (lbs *Listener) Start() (err error) {
 		log.Info().
 			Str("port", lbs.Port).Str("protocol", lbs.Protocol).
 			Msg("Starting Load Balancer Server")
-		lbs.IsRunning = true
+		lbs.State = LISTENER_STATE_ACTIVE
 		err := lbs.Srv.ListenAndServe()
 		if err == http.ErrServerClosed {
-			lbs.IsRunning = false
+			lbs.State = LISTENER_STATE_CLOSED
 			log.Info().Str("port", lbs.Port).Str("protocol", lbs.Protocol).Msg("Load Balancer server stopped")
 		} else if err != nil {
-			lbs.IsRunning = false
+			lbs.State = LISTENER_STATE_CLOSED
 			log.Info().Str("port", lbs.Port).Err(err).Str("protocol", lbs.Protocol).Msg("Load Balancer server failed to start.")
 		}
 	}(lbs)
@@ -67,7 +77,7 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 	}
 	balancersSync.Wait()
 
-	lbs.IsRunning = false
+	lbs.State = LISTENER_STATE_CLOSED
 
 	log.Info().
 		Str("port", lbs.Port).
@@ -76,10 +86,18 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 
 	serversSync.Done()
 }
-
+func (lbs *Listener) GetState() string {
+	states := map[LISTENER_STATE]string{
+		0: "init",
+		1: "active",
+		2: "closing",
+		3: "inactive",
+	}
+	return states[lbs.State]
+}
 func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if !lbs.IsRunning {
-		log.Info().Msg("Request rejected due to inactive listener")
+	if lbs.State != LISTENER_STATE_ACTIVE {
+		log.Info().Str("state", lbs.GetState()).Msg("Request rejected. Listener is not in active state")
 		return
 	}
 	requestURL := req.URL.RequestURI()
@@ -91,7 +109,7 @@ func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	found := false
 	for _, balancer := range lbs.Balancers {
-		if strings.Index(requestURL, balancer.RoutePrefix) == 0 {
+		if strings.Index(requestURL, balancer.RoutePrefix) == 0 && balancer.IsAvailable() {
 			found = true
 			balancerMatchWeight := len(balancer.RoutePrefix)
 			if candidateBalancer.weight < balancerMatchWeight {
@@ -103,13 +121,16 @@ func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if found {
 		log.Debug().
 			Str("lister", lbs.Protocol+":"+lbs.Port).
-			Str("balancer", candidateBalancer.balancer.Id).
 			Str("uri", req.RequestURI).
 			Str("method", req.Method).
 			Msg("Request received")
+
+		// Pass request to the chosen balancer
 		candidateBalancer.balancer.serveProxy(rw, req)
 	} else {
-		log.Info().Msgf("Balancer could not redirect request received at '%v'", requestURL)
+		log.Info().
+			Str("route", requestURL).
+			Msg("Request rejected. No matching balancer found.")
 	}
 }
 
