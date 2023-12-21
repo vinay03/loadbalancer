@@ -13,8 +13,8 @@ import (
 
 // Configuration
 const (
-	TARGET_CONNECTION_TIMEOUT   = 30 * time.Second
-	TARGET_CONNECTION_KEEPALIVE = 30 * time.Second
+	TARGET_CONNECTION_TIMEOUT   = 300 * time.Second
+	TARGET_CONNECTION_KEEPALIVE = 300 * time.Second
 )
 
 type Target struct {
