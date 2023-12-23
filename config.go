@@ -19,10 +19,11 @@ type LoadBalancerYAMLConfiguration struct {
 		SSLCertificate    string `yaml:"ssl_certificate"`
 		SSLCertificateKey string `yaml:"ssl_certificate_key"`
 		Routes            []struct {
-			Routeprefix string `yaml:"routeprefix"`
-			Id          string `yaml:"id"`
-			Mode        string `yaml:"mode"`
-			Targets     []struct {
+			Routeprefix   string             `yaml:"routeprefix"`
+			Id            string             `yaml:"id"`
+			Mode          string             `yaml:"mode"`
+			CustomHeaders []CustomHeaderRule `yaml:"customHeaders"`
+			Targets       []struct {
 				Address string `yaml:"address"`
 				Weight  int32  `yaml:"weight"`
 			} `yaml:"targets"`
@@ -133,15 +134,6 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 	if len(cnf.Listeners) > 0 {
 		for _, listener := range cnf.Listeners {
 
-			// Check type field
-			// if balancerCnf.Type == "" {
-			// 	balancerCnf.Type = DefaultLoadBalancerType
-			// 	log.Info().Str("balancer", balancerCnf.Name).Msgf("Type field defaults to '%v'", DefaultLoadBalancerType)
-			// }
-			// if !IsValidBalancerType(balancerCnf.Type) {
-			// 	log.Error().Str("balancer", balancerCnf.Name).Msgf("Type field is set to '%v', which is invalid. Supported types are : '%+v'", balancerCnf.Type, strings.Join(supportedBalancers, "', '"))
-			// }
-
 			// check protocol field
 			if listener.Protocol == "" {
 				log.Info().Msgf("Protocol field not set, hence setting to default '%v'", DefaultListenerProtocol)
@@ -178,6 +170,15 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 					route.Routeprefix = DefaultRoutePrefix
 				}
 
+				// Check Mode field
+				if route.Mode == "" {
+					route.Mode = DefaultLoadBalancerType
+					log.Info().Str("balancer", route.Id).Msgf("Mode field defaults to '%v'", DefaultLoadBalancerType)
+				}
+				if !IsValidBalancerMode(route.Mode) {
+					log.Error().Str("id", route.Id).Msgf("Mode field is set to '%v', which is invalid. Supported types are : '%+v'", route.Id, strings.Join(supportedBalancers, "', '"))
+				}
+
 				// Check targets field
 				if len(route.Targets) < 1 {
 					log.Error().Str("id", route.Id).Msg("No redirection targets mentioned")
@@ -190,42 +191,3 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 
 	return
 }
-
-// func (cnf *LoadBalancerYAMLConfiguration) Initialize() {
-// 	LoadBalancersPool = make(map[string]*LoadBalancer)
-// 	LoadBalancerServersPool = make(map[string]*LoadBalancerServer)
-
-// 	for _, balancerCnf := range cnf.Balancers {
-// 		var lbsrv *LoadBalancerServer
-// 		var ok bool
-// 		lbsrv, ok = LoadBalancerServersPool[balancerCnf.Port]
-// 		if !ok {
-// 			lbsrv = &LoadBalancerServer{
-// 				port:   balancerCnf.Port,
-// 				router: mux.NewRouter(),
-// 				srv: http.Server{
-// 					Addr: ":" + balancerCnf.Port,
-// 				},
-// 			}
-// 			LoadBalancerServersPool[balancerCnf.Port] = lbsrv
-// 		}
-
-// 		lbalancer := NewLoadBalancer(balancerCnf.Name, fmt.Sprint(balancerCnf.Port))
-
-// 		for _, server := range balancerCnf.Targets {
-// 			lbalancer.AddNewServer(NewSimpleServer(server.Address))
-// 		}
-
-// 		// _ = lbalancer.Start()
-
-// 		lbsrv.router.HandleFunc(balancerCnf.ApiPrefix, lbalancer.serveProxy)
-
-// 		LoadBalancersPool[balancerCnf.Name] = lbalancer
-// 		lbsrv.balancers = append(lbsrv.balancers, lbalancer)
-// 	}
-
-// 	// start all servers
-// 	for _, lbServer := range LoadBalancerServersPool {
-// 		lbServer.Start()
-// 	}
-// }

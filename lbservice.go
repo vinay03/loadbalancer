@@ -86,9 +86,10 @@ func (lbs *LoadBalancerService) Apply() {
 
 		for _, route := range listenerCnf.Routes {
 			lbalancer := &Balancer{
-				Id:          route.Id,
-				Mode:        route.Mode,
-				RoutePrefix: route.Routeprefix,
+				Id:                route.Id,
+				Mode:              route.Mode,
+				RoutePrefix:       route.Routeprefix,
+				CustomHeaderRules: route.CustomHeaders,
 			}
 			for _, target := range route.Targets {
 				lbalancer.AddNewServer(target.Address)
@@ -108,7 +109,7 @@ func (lbs *LoadBalancerService) Apply() {
 }
 
 func (lbs *LoadBalancerService) Stop() {
-	log.Info().Msg("Triggered shudown procedure for Load Balancer Service...")
+	log.Info().Msg("Triggered shutdown procedure for Load Balancer Service...")
 	serversSync := &sync.WaitGroup{}
 	serversSync.Add(len(lbs.Listeners))
 	for _, listener := range lbs.Listeners {
@@ -117,5 +118,5 @@ func (lbs *LoadBalancerService) Stop() {
 		}(serversSync, listener)
 	}
 	serversSync.Wait()
-	log.Info().Msg("Load Balancer service shudown completed")
+	log.Info().Msg("Load Balancer service shutdown completed")
 }

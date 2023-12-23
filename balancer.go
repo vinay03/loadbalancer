@@ -16,16 +16,24 @@ const (
 	LB_STATE_CLOSED  LB_STATE = 3
 )
 
+type CustomHeader struct {
+	Name  string
+	Value string
+}
+type CustomHeaderRule struct {
+	Method  string
+	Headers []CustomHeader
+}
+
 type Balancer struct {
-	// srv             http.Server
-	liveConnections sync.WaitGroup
-	Id              string
-	Mode            string
-	RoutePrefix     string
-	// port            string
-	roundRobinCount int
-	Targets         []*Target
-	State           LB_STATE
+	liveConnections   sync.WaitGroup
+	Id                string
+	Mode              string
+	RoutePrefix       string
+	roundRobinCount   int
+	Targets           []*Target
+	State             LB_STATE
+	CustomHeaderRules []CustomHeaderRule
 }
 
 var LoadBalancersPool map[string]*Balancer
@@ -49,6 +57,28 @@ func (lb *Balancer) IsAvailable() bool {
 	return lb.State == LB_STATE_ACTIVE
 }
 
+func (lb *Balancer) _parseCustomHeaderValue(header *CustomHeader, req *http.Request) string {
+	if header.Value == "[[client.ip]]" {
+		return req.RemoteAddr
+	} else if header.Value == "[[client.host]]" {
+		return req.RemoteAddr
+	} else {
+		return header.Value
+	}
+}
+
+func (lb *Balancer) AddCustomHeaders(req *http.Request) {
+	if len(lb.CustomHeaderRules) > 0 {
+		for _, rule := range lb.CustomHeaderRules {
+			if rule.Method == "any" || req.Method == rule.Method {
+				for _, header := range rule.Headers {
+					req.Header.Set(header.Name, lb._parseCustomHeaderValue(&header, req))
+				}
+			}
+		}
+	}
+}
+
 func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	target := lb.getNextAvailableServer()
 	log.Debug().
@@ -58,6 +88,7 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 		Msg("Forwarding request")
 
 	lb.liveConnections.Add(1)
+	// Add Custom headers if matches any
 	target.Serve(rw, req)
 	lb.liveConnections.Done()
 }

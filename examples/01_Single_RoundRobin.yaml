@@ -7,6 +7,15 @@ listeners:
       - routeprefix: "/"
         id: "root-default"
         mode: "RoundRobin"
+        customHeaders:
+          - method: "any"
+            headers:
+              - name: "Forwarded-For"
+                value: "[[client.ip]]"
+              - name: "Forwarded-Host"
+                value: "[[client.host]]"
+              - name: "Custom-Header"
+                value: "custom-value"
         targets: 
           - address: http://localhost:8091
           - address: http://localhost:8092

@@ -3,6 +3,7 @@ package main
 import (
 
 	// "log"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +16,8 @@ func main() {
 	LbService = LoadBalancerService{}
 
 	LbService.SetParams(loadFlags())
+
+	fmt.Println(PrettyPrint(LbService.Config))
 
 	LbService.Apply()
 
