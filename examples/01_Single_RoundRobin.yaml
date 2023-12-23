@@ -11,9 +11,11 @@ listeners:
           - method: "any"
             headers:
               - name: "Forwarded-For"
-                value: "[[client.ip]]"
+                value: "[[protocol]]"
               - name: "Forwarded-Host"
                 value: "[[client.host]]"
+              - name: "Forwarded-tls"
+                value: "[[tls.version]]"
               - name: "Custom-Header"
                 value: "custom-value"
         targets: 
