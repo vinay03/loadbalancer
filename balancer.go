@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -58,13 +59,17 @@ func (lb *Balancer) IsAvailable() bool {
 }
 
 func (lb *Balancer) _parseCustomHeaderValue(header *CustomHeader, req *http.Request) string {
-	if header.Value == "[[client.ip]]" {
-		return req.RemoteAddr
+	if header.Value == "[[protocol]]" {
+		return req.Proto
 	} else if header.Value == "[[client.host]]" {
-		return req.RemoteAddr
-	} else {
-		return header.Value
+		return req.Host
+	} else if header.Value == "[[tls.version]]" {
+		if req.TLS != nil {
+			return fmt.Sprint(req.TLS.Version)
+		}
+		return ""
 	}
+	return header.Value
 }
 
 func (lb *Balancer) AddCustomHeaders(req *http.Request) {
@@ -89,6 +94,8 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 
 	lb.liveConnections.Add(1)
 	// Add Custom headers if matches any
+	lb.AddCustomHeaders(req)
+
 	target.Serve(rw, req)
 	lb.liveConnections.Done()
 }
