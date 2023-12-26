@@ -68,6 +68,8 @@ func (lb *Balancer) _parseCustomHeaderValue(header *CustomHeader, req *http.Requ
 			return fmt.Sprint(req.TLS.Version)
 		}
 		return ""
+	} else if header.Value == "[[balancer.id]]" {
+		return lb.Id
 	}
 	return header.Value
 }

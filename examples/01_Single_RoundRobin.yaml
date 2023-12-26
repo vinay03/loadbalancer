@@ -10,7 +10,7 @@ listeners:
         customHeaders:
           - method: "any"
             headers:
-              - name: "Forwarded-For"
+              - name: "Forwarded-Protocol"
                 value: "[[protocol]]"
               - name: "Forwarded-Host"
                 value: "[[client.host]]"
@@ -18,6 +18,8 @@ listeners:
                 value: "[[tls.version]]"
               - name: "Custom-Header"
                 value: "custom-value"
+              - name: "Forwarded-By"
+                value: "[[balancer.id]]"
         targets: 
           - address: http://localhost:8091
           - address: http://localhost:8092
