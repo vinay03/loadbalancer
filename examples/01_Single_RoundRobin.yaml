@@ -24,6 +24,7 @@ listeners:
           - address: http://localhost:8091
           - address: http://localhost:8092
           - address: http://localhost:8093
+        TargetWaitTimeout: 10
       - routeprefix: "/orders"
         id: "orders"
         mode: "RoundRobin"

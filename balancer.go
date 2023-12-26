@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -31,23 +33,63 @@ type Balancer struct {
 	Id                string
 	Mode              string
 	RoutePrefix       string
-	roundRobinCount   int
+	TargetWaitTimeout time.Duration
 	Targets           []*Target
 	State             LB_STATE
 	CustomHeaderRules []CustomHeaderRule
+	// NextAvailableServer func(lb *Balancer) *Target
+	Logic BalancerLogic
 }
 
 var LoadBalancersPool map[string]*Balancer
 
-func (lb *Balancer) getNextAvailableServer() *Target {
-	target := lb.Targets[lb.roundRobinCount%len(lb.Targets)]
-	for !target.IsAlive() {
-		lb.roundRobinCount++
-		target = lb.Targets[lb.roundRobinCount%len(lb.Targets)]
-	}
-	lb.roundRobinCount++
-	return target
+type BalancerLogic interface {
+	Next(lb *Balancer) *Target
 }
+
+type RoundRobinLogic struct {
+	Counter int
+}
+
+func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
+	targetCount := len(lb.Targets)
+
+	ctx, cancelFunc := context.WithTimeout(context.Background(), lb.TargetWaitTimeout)
+	defer cancelFunc()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info().
+				Str("id", lb.Id).
+				Msg("Request is timing out due to no available targets.")
+			return nil
+		default:
+			target := lb.Targets[rbl.Counter%targetCount]
+			rbl.Counter++
+			if target.IsAlive() {
+				rbl.Counter = rbl.Counter % targetCount
+				return target
+			}
+		}
+	}
+}
+
+func (lb *Balancer) SetBalancerLogic() {
+	if lb.Mode == LB_MODE_ROUNDROBIN {
+		lb.Logic = &RoundRobinLogic{}
+	}
+}
+
+// func (lb *Balancer) getNextAvailableServer() *Target {
+// 	target := lb.Targets[lb.roundRobinCount%len(lb.Targets)]
+// 	for !target.IsAlive() {
+// 		lb.roundRobinCount++
+// 		target = lb.Targets[lb.roundRobinCount%len(lb.Targets)]
+// 	}
+// 	lb.roundRobinCount++
+// 	return target
+// }
 
 // http.Handler is a interface that expects ServeHTTP() function to be implemented.
 // func (lb *Balancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -87,7 +129,11 @@ func (lb *Balancer) AddCustomHeaders(req *http.Request) {
 }
 
 func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
-	target := lb.getNextAvailableServer()
+	// target := lb.NextAvailableServer(lb)
+	target := lb.Logic.Next(lb)
+	if target == nil {
+		return
+	}
 	log.Debug().
 		Str("uri", req.RequestURI).
 		Str("balancer", lb.Id).

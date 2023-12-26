@@ -89,8 +89,10 @@ func (lbs *LoadBalancerService) Apply() {
 				Id:                route.Id,
 				Mode:              route.Mode,
 				RoutePrefix:       route.Routeprefix,
+				TargetWaitTimeout: time.Duration(route.TargetWaitTimeout) * time.Second,
 				CustomHeaderRules: route.CustomHeaders,
 			}
+			lbalancer.SetBalancerLogic()
 			for _, target := range route.Targets {
 				lbalancer.AddNewServer(target.Address)
 			}

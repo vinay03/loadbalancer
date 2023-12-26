@@ -19,11 +19,12 @@ type LoadBalancerYAMLConfiguration struct {
 		SSLCertificate    string `yaml:"ssl_certificate"`
 		SSLCertificateKey string `yaml:"ssl_certificate_key"`
 		Routes            []struct {
-			Routeprefix   string             `yaml:"routeprefix"`
-			Id            string             `yaml:"id"`
-			Mode          string             `yaml:"mode"`
-			CustomHeaders []CustomHeaderRule `yaml:"customHeaders"`
-			Targets       []struct {
+			Routeprefix       string             `yaml:"routeprefix"`
+			Id                string             `yaml:"id"`
+			Mode              string             `yaml:"mode"`
+			CustomHeaders     []CustomHeaderRule `yaml:"customHeaders"`
+			TargetWaitTimeout int
+			Targets           []struct {
 				Address string `yaml:"address"`
 				Weight  int32  `yaml:"weight"`
 			} `yaml:"targets"`
@@ -37,10 +38,10 @@ const (
 	LS_PROTOCOL_HTTPS = "https"
 
 	// Balancer Modes
-	LB_TYPE_RANDOM              = "Random"
-	LB_TYPE_ROUNDROBIN          = "RoundRobin"
-	LB_TYPE_WEIGHTED_ROUNDROBIN = "WeightedRoundRobin"
-	LB_TYPE_PERFORMANCE_BASED   = "PerformanceBased"
+	LB_MODE_RANDOM              = "Random"
+	LB_MODE_ROUNDROBIN          = "RoundRobin"
+	LB_MODE_WEIGHTED_ROUNDROBIN = "WeightedRoundRobin"
+	LB_MODE_PERFORMANCE_BASED   = "PerformanceBased"
 
 	AUTO_GENERATED_BALANCER_ID_LENGTH = 10
 )
@@ -51,11 +52,11 @@ var supportedListenerProtocols []string = []string{
 }
 
 var supportedBalancers []string = []string{
-	LB_TYPE_ROUNDROBIN,
+	LB_MODE_ROUNDROBIN,
 }
 
 const (
-	DefaultLoadBalancerType string = LB_TYPE_ROUNDROBIN
+	DefaultLoadBalancerType string = LB_MODE_ROUNDROBIN
 	DefaultRoutePrefix      string = "/"
 	DefaultListenerPort     string = "80"
 	DefaultListenerProtocol string = LS_PROTOCOL_HTTP
