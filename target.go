@@ -18,12 +18,17 @@ const (
 )
 
 type Target struct {
-	addr  string
-	proxy *httputil.ReverseProxy
+	Address string
+	proxy   *httputil.ReverseProxy
 }
 
-func NewTarget(addr string) *Target {
-	serverUrl, err := url.Parse(addr)
+type TargetYAMLConfig struct {
+	Address string `yaml:"address"`
+	Weight  int32  `yaml:"weight"`
+}
+
+func NewTarget(targetConfig *TargetYAMLConfig) *Target {
+	serverUrl, err := url.Parse(targetConfig.Address)
 	if err != nil {
 		log.Fatal().Msg("Error occured while parsing node url")
 		os.Exit(1)
@@ -40,13 +45,9 @@ func NewTarget(addr string) *Target {
 	}
 
 	return &Target{
-		addr:  addr,
-		proxy: proxy,
+		Address: targetConfig.Address,
+		proxy:   proxy,
 	}
-}
-
-func (s *Target) Address() string {
-	return s.addr
 }
 
 func (s *Target) IsAlive() bool {

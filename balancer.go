@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -43,58 +42,18 @@ type Balancer struct {
 
 var LoadBalancersPool map[string]*Balancer
 
-type BalancerLogic interface {
-	Next(lb *Balancer) *Target
-}
-
-type RoundRobinLogic struct {
-	Counter int
-}
-
-func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
-	targetCount := len(lb.Targets)
-
-	ctx, cancelFunc := context.WithTimeout(context.Background(), lb.TargetWaitTimeout)
-	defer cancelFunc()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().
-				Str("id", lb.Id).
-				Msg("Request is timing out due to no available targets.")
-			return nil
-		default:
-			target := lb.Targets[rbl.Counter%targetCount]
-			rbl.Counter++
-			if target.IsAlive() {
-				rbl.Counter = rbl.Counter % targetCount
-				return target
-			}
-		}
-	}
-}
-
 func (lb *Balancer) SetBalancerLogic() {
 	if lb.Mode == LB_MODE_ROUNDROBIN {
 		lb.Logic = &RoundRobinLogic{}
+	} else if lb.Mode == LB_MODE_WEIGHTED_ROUNDROBIN {
+		lb.Logic = &WeightedRoundRobinLogic{}
+	}
+
+	// Initialize Balancer logic
+	if lb.Logic != nil {
+		lb.Logic.Init()
 	}
 }
-
-// func (lb *Balancer) getNextAvailableServer() *Target {
-// 	target := lb.Targets[lb.roundRobinCount%len(lb.Targets)]
-// 	for !target.IsAlive() {
-// 		lb.roundRobinCount++
-// 		target = lb.Targets[lb.roundRobinCount%len(lb.Targets)]
-// 	}
-// 	lb.roundRobinCount++
-// 	return target
-// }
-
-// http.Handler is a interface that expects ServeHTTP() function to be implemented.
-// func (lb *Balancer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-// 	lb.serveProxy(rw, req)
-// }
 
 func (lb *Balancer) IsAvailable() bool {
 	return lb.State == LB_STATE_ACTIVE
@@ -129,15 +88,16 @@ func (lb *Balancer) AddCustomHeaders(req *http.Request) {
 }
 
 func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
-	// target := lb.NextAvailableServer(lb)
 	target := lb.Logic.Next(lb)
+	log.Info().
+		Msg("Target Received")
 	if target == nil {
 		return
 	}
 	log.Debug().
 		Str("uri", req.RequestURI).
 		Str("balancer", lb.Id).
-		Str("to", target.Address()).
+		Str("to", target.Address).
 		Msg("Forwarding request")
 
 	lb.liveConnections.Add(1)
@@ -154,7 +114,7 @@ func (lb *Balancer) UpdateState() {
 	}
 }
 
-func (lb *Balancer) AddNewServer(addr string) {
-	lb.Targets = append(lb.Targets, NewTarget(addr))
+func (lb *Balancer) AddNewServer(targetConfig *TargetYAMLConfig) {
+	lb.Targets = append(lb.Targets, NewTarget(targetConfig))
 	lb.UpdateState()
 }

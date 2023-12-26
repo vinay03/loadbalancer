@@ -24,10 +24,7 @@ type LoadBalancerYAMLConfiguration struct {
 			Mode              string             `yaml:"mode"`
 			CustomHeaders     []CustomHeaderRule `yaml:"customHeaders"`
 			TargetWaitTimeout int
-			Targets           []struct {
-				Address string `yaml:"address"`
-				Weight  int32  `yaml:"weight"`
-			} `yaml:"targets"`
+			Targets           []TargetYAMLConfig `yaml:"targets"`
 		} `yaml:"routes"`
 	} `yaml:"listeners"`
 }

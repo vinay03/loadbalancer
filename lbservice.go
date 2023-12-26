@@ -94,7 +94,7 @@ func (lbs *LoadBalancerService) Apply() {
 			}
 			lbalancer.SetBalancerLogic()
 			for _, target := range route.Targets {
-				lbalancer.AddNewServer(target.Address)
+				lbalancer.AddNewServer(&target)
 			}
 
 			lbListener.Balancers = append(lbListener.Balancers, lbalancer)
