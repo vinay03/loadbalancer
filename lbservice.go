@@ -89,8 +89,12 @@ func (lbs *LoadBalancerService) Apply() {
 				Id:                route.Id,
 				Mode:              route.Mode,
 				RoutePrefix:       route.Routeprefix,
-				TargetWaitTimeout: time.Duration(route.TargetWaitTimeout) * time.Second,
 				CustomHeaderRules: route.CustomHeaders,
+			}
+			if route.TargetWaitTimeout > 0 {
+				lbalancer.TargetWaitTimeout = time.Duration(route.TargetWaitTimeout) * time.Second
+			} else {
+				lbalancer.TargetWaitTimeout = DEFAULT_TARGET_WAIT_TIMEOUT
 			}
 			lbalancer.SetBalancerLogic()
 			for _, target := range route.Targets {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -23,42 +23,28 @@ func (rbl *RoundRobinLogic) Init() {
 func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 	targetCount := len(lb.Targets)
 
-	ctx, cancelFunc := context.WithTimeout(context.Background(), lb.TargetWaitTimeout)
-	defer cancelFunc()
-
 	var successTarget = make(chan *Target, 1)
-
 	go func() {
 		for {
 			target := lb.Targets[rbl.Counter%targetCount]
 			rbl.Counter++
 			if target.IsAlive() {
 				rbl.Counter = rbl.Counter % targetCount
-				log.Info().Msg("Target chosen")
 				successTarget <- target
 				break
 			}
 		}
 	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().
-				Str("id", lb.Id).
-				Msg("Request is timing out due to no available targets.")
-			return nil
-		case target := <-successTarget:
-			log.Info().Msg("Target accepted")
-			return target
-			// default:
-			// target := lb.Targets[wrbl.Counter%targetCount]
-			// wrbl.Counter++
-			// if target.IsAlive() {
-			// 	wrbl.Counter = wrbl.Counter % targetCount
-			// 	return target
-			// }
-		}
+	select {
+	case <-time.After(lb.TargetWaitTimeout):
+		log.Info().
+			Str("balancer", lb.Id).
+			Str("mode", LB_MODE_ROUNDROBIN).
+			Msg("Request is timing out due to no available targets.")
+		return nil
+	case target := <-successTarget:
+		return target
 	}
 	return nil
 }
@@ -77,23 +63,31 @@ func (wrbl *WeightedRoundRobinLogic) Init() {
 func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 	targetCount := len(lb.Targets)
 
-	ctx, cancelFunc := context.WithTimeout(context.Background(), lb.TargetWaitTimeout)
-	defer cancelFunc()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().
-				Str("id", lb.Id).
-				Msg("Request is timing out due to no available targets.")
-			return nil
-		default:
+	var successTarget = make(chan *Target, 1)
+	go func() {
+		for {
 			target := lb.Targets[wrbl.Counter%targetCount]
-			wrbl.Counter++
+			wrbl.WeightCounter++
+			if target.Weight <= wrbl.WeightCounter {
+				wrbl.Counter++
+				wrbl.WeightCounter = 0
+			}
 			if target.IsAlive() {
 				wrbl.Counter = wrbl.Counter % targetCount
-				return target
+				successTarget <- target
+				break
 			}
 		}
+	}()
+
+	select {
+	case <-time.After(lb.TargetWaitTimeout):
+		log.Info().
+			Str("balancer", lb.Id).
+			Str("mode", LB_MODE_WEIGHTED_ROUNDROBIN).
+			Msg("Request is timing out due to no available targets.")
+		return nil
+	case target := <-successTarget:
+		return target
 	}
 }

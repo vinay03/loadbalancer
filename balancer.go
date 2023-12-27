@@ -89,8 +89,6 @@ func (lb *Balancer) AddCustomHeaders(req *http.Request) {
 
 func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	target := lb.Logic.Next(lb)
-	log.Info().
-		Msg("Target Received")
 	if target == nil {
 		return
 	}

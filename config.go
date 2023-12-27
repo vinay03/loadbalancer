@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -23,12 +24,13 @@ type LoadBalancerYAMLConfiguration struct {
 			Id                string             `yaml:"id"`
 			Mode              string             `yaml:"mode"`
 			CustomHeaders     []CustomHeaderRule `yaml:"customHeaders"`
-			TargetWaitTimeout int
+			TargetWaitTimeout int                `yaml:"targetWaitTimeout"`
 			Targets           []TargetYAMLConfig `yaml:"targets"`
 		} `yaml:"routes"`
 	} `yaml:"listeners"`
 }
 
+// Default Config and constants
 const (
 	// Listener Protocol
 	LS_PROTOCOL_HTTP  = "http"
@@ -41,6 +43,13 @@ const (
 	LB_MODE_PERFORMANCE_BASED   = "PerformanceBased"
 
 	AUTO_GENERATED_BALANCER_ID_LENGTH = 10
+
+	DEFAULT_TARGET_WAIT_TIMEOUT time.Duration = 15 * time.Second
+
+	TARGET_CONNECTION_TIMEOUT   = 300 * time.Second
+	TARGET_CONNECTION_KEEPALIVE = 300 * time.Second
+
+	DEFAULT_TARGET_WEIGHT = 1
 )
 
 var supportedListenerProtocols []string = []string{
@@ -49,7 +58,7 @@ var supportedListenerProtocols []string = []string{
 }
 
 var supportedBalancers []string = []string{
-	LB_MODE_ROUNDROBIN,
+	LB_MODE_ROUNDROBIN, LB_MODE_WEIGHTED_ROUNDROBIN,
 }
 
 const (
@@ -164,7 +173,7 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 
 				// Check Route Prefix field
 				if len(route.Routeprefix) < 1 {
-					log.Info().Str("id", route.Id).Msg("`routeprefix` field not specified. Set to '/' by default.")
+					log.Info().Str("balancer", route.Id).Msg("`routeprefix` field not specified. Set to '/' by default.")
 					route.Routeprefix = DefaultRoutePrefix
 				}
 
@@ -174,12 +183,12 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 					log.Info().Str("balancer", route.Id).Msgf("Mode field defaults to '%v'", DefaultLoadBalancerType)
 				}
 				if !IsValidBalancerMode(route.Mode) {
-					log.Error().Str("id", route.Id).Msgf("Mode field is set to '%v', which is invalid. Supported types are : '%+v'", route.Id, strings.Join(supportedBalancers, "', '"))
+					log.Error().Str("balancer", route.Id).Msgf("Mode field is set to '%v', which is invalid. Supported types are : '%+v'", route.Mode, strings.Join(supportedBalancers, "', '"))
 				}
 
 				// Check targets field
 				if len(route.Targets) < 1 {
-					log.Error().Str("id", route.Id).Msg("No redirection targets mentioned")
+					log.Error().Str("balancer", route.Id).Msg("No redirection targets mentioned")
 				}
 			}
 		}

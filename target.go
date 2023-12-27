@@ -11,20 +11,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Configuration
-const (
-	TARGET_CONNECTION_TIMEOUT   = 300 * time.Second
-	TARGET_CONNECTION_KEEPALIVE = 300 * time.Second
-)
-
 type Target struct {
 	Address string
 	proxy   *httputil.ReverseProxy
+	Weight  int
 }
 
 type TargetYAMLConfig struct {
 	Address string `yaml:"address"`
-	Weight  int32  `yaml:"weight"`
+	Weight  int    `yaml:"weight"`
 }
 
 func NewTarget(targetConfig *TargetYAMLConfig) *Target {
@@ -44,10 +39,19 @@ func NewTarget(targetConfig *TargetYAMLConfig) *Target {
 		TLSHandshakeTimeout: 180 * time.Second,
 	}
 
-	return &Target{
+	target := &Target{
 		Address: targetConfig.Address,
+		Weight:  targetConfig.Weight,
 		proxy:   proxy,
 	}
+
+	if targetConfig.Weight > 0 {
+		target.Weight = targetConfig.Weight
+	} else {
+		target.Weight = DEFAULT_TARGET_WEIGHT
+	}
+
+	return target
 }
 
 func (s *Target) IsAlive() bool {
