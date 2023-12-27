@@ -67,12 +67,12 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 
 	for _, balancer := range lbs.Balancers {
 		go func(balancersSync *sync.WaitGroup, balancer *Balancer) {
-			log.Debug().Str("id", balancer.Id).Msg("Closing Load Balancer")
+			log.Debug().Str("balancer", balancer.Id).Msg("Closing Load Balancer")
 			balancer.State = LB_STATE_CLOSING
 			balancer.liveConnections.Wait()
 			balancer.State = LB_STATE_CLOSED
 			balancersSync.Done()
-			log.Debug().Str("id", balancer.Id).Msg("Load Balancer Closed")
+			log.Debug().Str("balancer", balancer.Id).Msg("Load Balancer Closed")
 		}(balancersSync, balancer)
 	}
 	balancersSync.Wait()

@@ -11,19 +11,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Configuration
-const (
-	TARGET_CONNECTION_TIMEOUT   = 300 * time.Second
-	TARGET_CONNECTION_KEEPALIVE = 300 * time.Second
-)
-
 type Target struct {
-	addr  string
-	proxy *httputil.ReverseProxy
+	Address string
+	proxy   *httputil.ReverseProxy
+	Weight  int
 }
 
-func NewTarget(addr string) *Target {
-	serverUrl, err := url.Parse(addr)
+type TargetYAMLConfig struct {
+	Address string `yaml:"address"`
+	Weight  int    `yaml:"weight"`
+}
+
+func NewTarget(targetConfig *TargetYAMLConfig) *Target {
+	serverUrl, err := url.Parse(targetConfig.Address)
 	if err != nil {
 		log.Fatal().Msg("Error occured while parsing node url")
 		os.Exit(1)
@@ -39,14 +39,19 @@ func NewTarget(addr string) *Target {
 		TLSHandshakeTimeout: 180 * time.Second,
 	}
 
-	return &Target{
-		addr:  addr,
-		proxy: proxy,
+	target := &Target{
+		Address: targetConfig.Address,
+		Weight:  targetConfig.Weight,
+		proxy:   proxy,
 	}
-}
 
-func (s *Target) Address() string {
-	return s.addr
+	if targetConfig.Weight > 0 {
+		target.Weight = targetConfig.Weight
+	} else {
+		target.Weight = DEFAULT_TARGET_WEIGHT
+	}
+
+	return target
 }
 
 func (s *Target) IsAlive() bool {
