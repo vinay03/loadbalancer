@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -15,9 +17,11 @@ func GetNumberedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Reque
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(struct {
-			message string
+			message   string
+			replicaId int
 		}{
-			message: fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			replicaId: ReplicaNumber,
 		})
 	}
 }
@@ -30,9 +34,11 @@ func GetDelayedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Reques
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 		json.NewEncoder(rw).Encode(struct {
-			message string
+			message   string
+			replicaId int
 		}{
-			message: fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			replicaId: ReplicaNumber,
 		})
 	}
 }
@@ -73,6 +79,41 @@ func StartTestServers(replicasCount int) {
 	}
 }
 
+func YAMLLine(step int, content string) (line string) {
+	if step > 0 {
+		line += strings.Repeat("  ", step)
+	}
+	line += content + "\n"
+	return line
+}
+
+func generateBasicYAML(mode string, route string) string {
+	yaml := `listeners:
+  - protocol: http
+    port: 8080
+    ssl_certificate: test-value
+    ssl_certificate_key: test-value
+    routes:
+      - routeprefix: "%s"
+        mode: "%s"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
+          - address: http://localhost:8093`
+	return fmt.Sprintf(yaml, route, mode)
+}
+
 func StopTestServers() {
 
+}
+
+func doHTTPGetRequest(requestURL string) *http.Response {
+	// requestURL := fmt.Sprintf("http://localhost:%v/", serverPort)
+	res, err := http.Get(requestURL)
+	if err != nil {
+		fmt.Printf("error making http request: %s\n", err)
+		os.Exit(1)
+	}
+	return res
 }

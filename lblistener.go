@@ -41,7 +41,7 @@ func (lbs *Listener) Start() (err error) {
 		log.Info().
 			Str("port", lbs.Port).Str("protocol", lbs.Protocol).
 			Msg("Starting Load Balancer Server")
-		lbs.State = LISTENER_STATE_ACTIVE
+		// lbs.State = LISTENER_STATE_ACTIVE
 		err := lbs.Srv.ListenAndServe()
 		if err == http.ErrServerClosed {
 			lbs.State = LISTENER_STATE_CLOSED

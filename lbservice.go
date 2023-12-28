@@ -46,9 +46,10 @@ func (lbs *LoadBalancerService) SetParams(config *LoadBalancerServiceParams) {
 	lbs.Params = config
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	if lbs.Params.DebugMode {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{
