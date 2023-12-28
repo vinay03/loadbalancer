@@ -109,7 +109,6 @@ func StopTestServers() {
 }
 
 func doHTTPGetRequest(requestURL string) *http.Response {
-	// requestURL := fmt.Sprintf("http://localhost:%v/", serverPort)
 	res, err := http.Get(requestURL)
 	if err != nil {
 		fmt.Printf("error making http request: %s\n", err)

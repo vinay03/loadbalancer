@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -26,6 +28,7 @@ type Listener struct {
 	SSLCertificateKey string
 	Balancers         []*Balancer
 	State             LISTENER_STATE
+	ListenerWG        *sync.WaitGroup
 	// IsRunning         bool
 }
 
@@ -41,7 +44,11 @@ func (lbs *Listener) Start() (err error) {
 		log.Info().
 			Str("port", lbs.Port).Str("protocol", lbs.Protocol).
 			Msg("Starting Load Balancer Server")
-		// lbs.State = LISTENER_STATE_ACTIVE
+
+		lbs.ListenerWG.Add(1)
+
+		lbs.checkStateByPoll()
+
 		err := lbs.Srv.ListenAndServe()
 		if err == http.ErrServerClosed {
 			lbs.State = LISTENER_STATE_CLOSED
@@ -50,9 +57,45 @@ func (lbs *Listener) Start() (err error) {
 			lbs.State = LISTENER_STATE_CLOSED
 			log.Info().Str("port", lbs.Port).Err(err).Str("protocol", lbs.Protocol).Msg("Load Balancer server failed to start.")
 		}
+		lbs.ListenerWG.Done()
 	}(lbs)
 
 	return nil
+}
+
+func (lbs *Listener) checkStateByPoll() {
+	loopBreaker := 1000
+	go func(lbs *Listener) {
+		for {
+			if lbs.State != LISTENER_STATE_INIT {
+				log.Error().
+					Str("port", lbs.Port).
+					Str("protocol", lbs.Protocol).
+					Msgf("Exiting State checker due to unexpected listener state '%v'", lbs.GetState())
+				break
+			}
+			requestURL := lbs.Protocol + "://localhost:" + lbs.Port + "/"
+			res, err := http.Get(requestURL)
+			if err != nil {
+				log.Error().
+					Str("port", lbs.Port).
+					Str("protocol", lbs.Protocol).
+					Msgf("Error making request to listener at '%v'", requestURL)
+			}
+			if res.StatusCode == 200 {
+				log.Info().
+					Str("port", lbs.Port).
+					Str("protocol", lbs.Protocol).
+					Msg("Listener is active")
+				break
+			}
+			time.Sleep(2 * time.Millisecond)
+			loopBreaker--
+			if loopBreaker <= 0 {
+				break
+			}
+		}
+	}(lbs)
 }
 
 func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
@@ -72,20 +115,19 @@ func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {
 			balancer.liveConnections.Wait()
 			balancer.State = LB_STATE_CLOSED
 			balancersSync.Done()
-			log.Debug().Str("balancer", balancer.Id).Msg("Load Balancer Closed")
+			log.Debug().Str("balancer", balancer.Id).Msg("- Load Balancer Closed")
 		}(balancersSync, balancer)
 	}
 	balancersSync.Wait()
 
 	lbs.State = LISTENER_STATE_CLOSED
-
-	log.Info().
-		Str("port", lbs.Port).
-		Str("protocol", lbs.Protocol).
-		Msg("Listener stopped")
+	_ = lbs.Srv.Shutdown(context.Background())
+	lbs.ListenerWG.Wait()
 
 	serversSync.Done()
 }
+
+// Returns state in string format
 func (lbs *Listener) GetState() string {
 	states := map[LISTENER_STATE]string{
 		0: "init",
@@ -95,10 +137,19 @@ func (lbs *Listener) GetState() string {
 	}
 	return states[lbs.State]
 }
+
+// Handles are incoming requests for listener
 func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if lbs.State != LISTENER_STATE_ACTIVE {
-		log.Info().Str("state", lbs.GetState()).Msg("Request rejected. Listener is not in active state")
-		return
+		if lbs.State == LISTENER_STATE_INIT {
+			lbs.State = LISTENER_STATE_ACTIVE
+			rw.WriteHeader(http.StatusOK)
+			rw.Write([]byte("Activated"))
+			return
+		} else {
+			log.Info().Str("state", lbs.GetState()).Msg("Request rejected. Listener is not in active state")
+			return
+		}
 	}
 	requestURL := req.URL.RequestURI()
 

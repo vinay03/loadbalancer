@@ -83,6 +83,7 @@ func (lbs *LoadBalancerService) Apply() {
 			Srv: http.Server{
 				Addr: ":" + listenerCnf.Port,
 			},
+			ListenerWG: &sync.WaitGroup{},
 		}
 
 		for _, route := range listenerCnf.Routes {

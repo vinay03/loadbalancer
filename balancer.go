@@ -96,7 +96,7 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 		Str("uri", req.RequestURI).
 		Str("balancer", lb.Id).
 		Str("to", target.Address).
-		Msg("Forwarding request")
+		Msg("- Forwarding request")
 
 	lb.liveConnections.Add(1)
 	// Add Custom headers if matches any
