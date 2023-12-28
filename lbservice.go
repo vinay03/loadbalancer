@@ -111,9 +111,12 @@ func (lbs *LoadBalancerService) Apply() {
 	}
 
 	// start all listeners
+	startersSync := &sync.WaitGroup{}
+	startersSync.Add(len(lbs.Listeners))
 	for _, lblistener := range lbs.Listeners {
-		lblistener.Start()
+		lblistener.Start(startersSync)
 	}
+	startersSync.Wait()
 }
 
 func (lbs *LoadBalancerService) Stop() {

@@ -34,7 +34,8 @@ type Listener struct {
 
 // var LoadBalancerListenersPool map[string]*LoadBalancerListener
 
-func (lbs *Listener) Start() (err error) {
+// Starts Listener and initiates state checker
+func (lbs *Listener) Start(startersSync *sync.WaitGroup) (err error) {
 	if lbs.State != LISTENER_STATE_INIT {
 		err = errors.New("LoadBalancer server is already running")
 		return
@@ -47,7 +48,7 @@ func (lbs *Listener) Start() (err error) {
 
 		lbs.ListenerWG.Add(1)
 
-		lbs.checkStateByPoll()
+		lbs.checkStateByPoll(startersSync)
 
 		err := lbs.Srv.ListenAndServe()
 		if err == http.ErrServerClosed {
@@ -63,9 +64,10 @@ func (lbs *Listener) Start() (err error) {
 	return nil
 }
 
-func (lbs *Listener) checkStateByPoll() {
+// Repeatatively checks whether listener is ready to serve requests
+func (lbs *Listener) checkStateByPoll(startersSync *sync.WaitGroup) {
 	loopBreaker := 1000
-	go func(lbs *Listener) {
+	go func(lbs *Listener, startersSync *sync.WaitGroup) {
 		for {
 			if lbs.State != LISTENER_STATE_INIT {
 				log.Error().
@@ -95,7 +97,8 @@ func (lbs *Listener) checkStateByPoll() {
 				break
 			}
 		}
-	}(lbs)
+		startersSync.Done()
+	}(lbs, startersSync)
 }
 
 func (lbs *Listener) Shutdown(serversSync *sync.WaitGroup) {

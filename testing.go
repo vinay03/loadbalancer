@@ -12,16 +12,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type TestServerDummyResponse struct {
+	Message   string `json:"message"`
+	ReplicaId int    `json:"replicaId"`
+}
+
 func GetNumberedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(struct {
-			message   string
-			replicaId int
-		}{
-			message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
-			replicaId: ReplicaNumber,
+		json.NewEncoder(rw).Encode(TestServerDummyResponse{
+			Message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			ReplicaId: ReplicaNumber,
 		})
 	}
 }
@@ -33,12 +35,9 @@ func GetDelayedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Reques
 		log.Println("ending wait...")
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(struct {
-			message   string
-			replicaId int
-		}{
-			message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
-			replicaId: ReplicaNumber,
+		json.NewEncoder(rw).Encode(TestServerDummyResponse{
+			Message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
+			ReplicaId: ReplicaNumber,
 		})
 	}
 }
@@ -108,11 +107,12 @@ func StopTestServers() {
 
 }
 
-func doHTTPGetRequest(requestURL string) *http.Response {
+func doHTTPGetRequest(requestURL string, v any) *http.Response {
 	res, err := http.Get(requestURL)
 	if err != nil {
 		fmt.Printf("error making http request: %s\n", err)
 		os.Exit(1)
 	}
+	json.NewDecoder(res.Body).Decode(v)
 	return res
 }

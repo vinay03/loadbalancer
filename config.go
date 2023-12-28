@@ -163,10 +163,11 @@ func UnmarshalYAML(contents *[]byte) (cnf *LoadBalancerYAMLConfiguration) {
 				}
 			}
 
-			for _, route := range listener.Routes {
+			for index, route := range listener.Routes {
 				// Check Id field
 				if len(route.Id) < 1 {
 					route.Id = generateBalancerId(balancerIdsCheckPool)
+					listener.Routes[index].Id = route.Id
 					log.Info().Str("new-id", route.Id).Msg("Id field was not set hence auto-assigning a unique identifier")
 				}
 				balancerIdsCheckPool[route.Id] = true
