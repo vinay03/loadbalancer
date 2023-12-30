@@ -18,7 +18,7 @@ func Test_Sample(t *testing.T) {
     routes:
       - routeprefix: "/"
         mode: "RoundRobin"
-				id: "round-robin-root"
+        id: "round-robin-root"
         targets: 
           - address: http://localhost:8091
           - address: http://localhost:8092
@@ -30,11 +30,15 @@ func Test_Sample(t *testing.T) {
     routes:
       - routeprefix: "/"
         mode: "WeightedRoundRobin"
-				id: "weighted-round-robin-root"
+        id: "weighted-round-robin-root"
         targets: 
           - address: http://localhost:8091
+            weight: 3
           - address: http://localhost:8092
-          - address: http://localhost:8093`
+            weight: 2
+          - address: http://localhost:8093
+            weight: 1
+`
 	RoundRobinBalancerURL := "http://localhost:8080/"
 	WeightedRoundRobinBalancerURL := "http://localhost:8081/"
 
@@ -46,10 +50,12 @@ func Test_Sample(t *testing.T) {
 	LbService.SetParams(config)
 	LbService.Apply()
 
-	t.Run("Check basic balancer config", func(t *testing.T) {
+	// Start Test Servers
+	StartTestServers(3)
 
-		RoundRobinTestData := []int{1, 2, 3, 1}
-		for _, expectedReplicaId := range RoundRobinTestData {
+	t.Run("Check basic balancer config", func(t *testing.T) {
+		TestData := []int{1, 2, 3, 1, 2, 3, 1}
+		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
 			res := doHTTPGetRequest(RoundRobinBalancerURL, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
@@ -58,8 +64,8 @@ func Test_Sample(t *testing.T) {
 	})
 
 	t.Run("Check Basic Balancer config: Weighted Round Robin", func(t *testing.T) {
-		WeightedRoundRobinTestData := []int{1, 1, 1, 2, 2, 3, 1, 1, 1}
-		for _, expectedReplicaId := range WeightedRoundRobinTestData {
+		TestData := []int{1, 1, 1, 2, 2, 3, 1, 1, 1, 2, 2, 3, 1, 1, 1}
+		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
 			res := doHTTPGetRequest(WeightedRoundRobinBalancerURL, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
@@ -72,4 +78,5 @@ func Test_Sample(t *testing.T) {
 	})
 
 	LbService.Stop()
+	StopTestServers()
 }
