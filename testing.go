@@ -86,22 +86,35 @@ func YAMLLine(step int, content string) (line string) {
 	return line
 }
 
-func generateBasicYAML(mode string, route string) string {
-	yaml := `listeners:
-  - protocol: http
-    port: 8080
-    ssl_certificate: test-value
-    ssl_certificate_key: test-value
-    routes:
-      - routeprefix: "%s"
-        mode: "%s"
-        targets: 
-          - address: http://localhost:8091
-          - address: http://localhost:8092
-          - address: http://localhost:8093
-          - address: http://localhost:8093`
-	return fmt.Sprintf(yaml, route, mode)
-}
+// func generateBasicYAML(mode string, route string) string {
+// 	yaml := `listeners:
+//   - protocol: http
+//     port: 8080
+//     ssl_certificate:
+//     ssl_certificate_key:
+//     routes:
+//       - routeprefix: "/"
+//         mode: "RoundRobin"
+//         targets:
+//           - address: http://localhost:8091
+//           - address: http://localhost:8092
+//           - address: http://localhost:8093
+//   - protocol: http
+//     port: 8081
+//     ssl_certificate:
+//     ssl_certificate_key:
+//     routes:
+//       - routeprefix: "/"
+//         mode: "WeightedRoundRobin"
+//         targets:
+//           - address: http://localhost:8091
+//             Weight: 3
+//           - address: http://localhost:8092
+//             Weight: 2
+//           - address: http://localhost:8093`
+//             Weight: 1
+// 	return fmt.Sprintf(yaml, route, mode)
+// }
 
 func StopTestServers() {
 
