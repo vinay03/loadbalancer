@@ -16,18 +16,27 @@ import (
 )
 
 type TestServerDummyResponse struct {
-	Message   string `json:"message"`
-	ReplicaId int    `json:"replicaId"`
+	Message   string            `json:"message"`
+	ReplicaId int               `json:"replicaId"`
+	Headers   map[string]string `json:"_headers"`
 }
 
 func GetNumberedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(TestServerDummyResponse{
+
+		response := TestServerDummyResponse{
 			Message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
 			ReplicaId: ReplicaNumber,
-		})
+		}
+		response.Headers = make(map[string]string)
+		for name, values := range req.Header {
+			for _, value := range values {
+				response.Headers[name] = value
+			}
+		}
+		json.NewEncoder(rw).Encode(response)
 	}
 }
 
@@ -38,10 +47,17 @@ func GetDelayedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Reques
 		// log.Println("ending wait...")
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(TestServerDummyResponse{
+		response := TestServerDummyResponse{
 			Message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
 			ReplicaId: ReplicaNumber,
-		})
+		}
+		response.Headers = make(map[string]string)
+		for name, values := range req.Header {
+			for _, value := range values {
+				response.Headers[name] = value
+			}
+		}
+		json.NewEncoder(rw).Encode(response)
 	}
 }
 
@@ -87,18 +103,17 @@ func StartTestServers(replicasCount int) {
 		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET")
 
 		srv.Handler = router
-		// fmt.Printf("API for replica #%v started\n", ReplicaNumber)
 		url := "http://localhost" + srv.Addr + "/"
 		go TestServerCheckState(url, TestServersSync)
 		go srv.ListenAndServe()
 	}
 	log.Info().Msg("Waiting till the test servers are up")
 	TestServersSync.Wait()
-	// time.Sleep(3 * time.Second)
 }
 
 func TestServerCheckState(requestURL string, TestServerSync *sync.WaitGroup) {
 	loopBreaker := 100
+	time.Sleep(200 * time.Millisecond)
 	for {
 		res, err := http.Get(requestURL)
 		if err != nil {
@@ -112,7 +127,7 @@ func TestServerCheckState(requestURL string, TestServerSync *sync.WaitGroup) {
 		} else {
 			log.Info().Msgf("Response status '%v' from '%v ", res.StatusCode, requestURL)
 		}
-		time.Sleep(3 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 		loopBreaker--
 		if loopBreaker <= 0 {
 			log.Error().

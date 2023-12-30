@@ -91,7 +91,7 @@ func (lbs *Listener) checkStateByPoll(startersSync *sync.WaitGroup) {
 					Msg("Listener is active")
 				break
 			}
-			time.Sleep(2 * time.Millisecond)
+			time.Sleep(30 * time.Millisecond)
 			loopBreaker--
 			if loopBreaker <= 0 {
 				break

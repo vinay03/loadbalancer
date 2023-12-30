@@ -19,6 +19,31 @@ func Test_Sample(t *testing.T) {
       - routeprefix: "/"
         mode: "RoundRobin"
         id: "round-robin-root"
+        customHeaders:
+          - method: "any"
+            headers:
+              - name: "Forwarded-Protocol"
+                value: "[[protocol]]"
+              - name: "Forwarded-Host"
+                value: "[[client.host]]"
+              - name: "Forwarded-tls"
+                value: "[[tls.version]]"
+              - name: "Custom-Header"
+                value: "custom-value"
+              - name: "Forwarded-By"
+                value: "[[balancer.id]]"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
+      - routeprefix: "/health"
+        mode: "RoundRobin"
+        id: "round-robin-health"
+        customHeaders:
+          - method: "any"
+            headers:
+              - name: "Forwarded-By"
+                value: "[[balancer.id]]"
         targets: 
           - address: http://localhost:8091
           - address: http://localhost:8092
@@ -53,7 +78,7 @@ func Test_Sample(t *testing.T) {
 	// Start Test Servers
 	StartTestServers(3)
 
-	t.Run("Check basic balancer config", func(t *testing.T) {
+	t.Run("Check basic balancer config: Round Robin", func(t *testing.T) {
 		TestData := []int{1, 2, 3, 1, 2, 3, 1}
 		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
@@ -73,8 +98,12 @@ func Test_Sample(t *testing.T) {
 		}
 	})
 
-	t.Run("Check route prefix field", func(t *testing.T) {
-
+	t.Run("Check custom headers : static", func(t *testing.T) {
+		body := new(TestServerDummyResponse)
+		expectedValue := "custom-value"
+		_ = doHTTPGetRequest(WeightedRoundRobinBalancerURL, body)
+		actualHeaderValue := body.Headers
+		assert.Equal(t, expectedValue, actualHeaderValue, "Static custom headers feature is not working")
 	})
 
 	LbService.Stop()
