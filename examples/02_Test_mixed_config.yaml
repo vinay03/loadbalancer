@@ -21,7 +21,7 @@ listeners:
               - name: "Forwarded-By"
                 value: "[[balancer.id]]"
           - method:
-        targets: 
+        targets:
           - address: http://localhost:8091
           - address: http://localhost:8092
           - address: http://localhost:8093
@@ -33,7 +33,7 @@ listeners:
             headers:
               - name: "Forwarded-By"
                 value: "[[balancer.id]]"
-        targets: 
+        targets:
           - address: http://localhost:8091
           - address: http://localhost:8092
           - address: http://localhost:8093
