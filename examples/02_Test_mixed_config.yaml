@@ -1,0 +1,54 @@
+listeners:
+  - protocol: http
+    port: 8080
+    ssl_certificate:
+    ssl_certificate_key:
+    routes:
+      - routeprefix: "/"
+        mode: "RoundRobin"
+        id: "round-robin-root"
+        customHeaders:
+          - method: "any"
+            headers:
+              - name: "Forwarded-Protocol"
+                value: "[[protocol]]"
+              - name: "Forwarded-Host"
+                value: "[[client.host]]"
+              - name: "Forwarded-tls"
+                value: "[[tls.version]]"
+              - name: "Custom-Header"
+                value: "custom-value"
+              - name: "Forwarded-By"
+                value: "[[balancer.id]]"
+          - method:
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
+      - routeprefix: "/health"
+        mode: "RoundRobin"
+        id: "round-robin-health"
+        customHeaders:
+          - method: "any"
+            headers:
+              - name: "Forwarded-By"
+                value: "[[balancer.id]]"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
+  - protocol: http
+    port: 8081
+    ssl_certificate:
+    ssl_certificate_key:
+    routes:
+      - routeprefix: "/"
+        mode: "WeightedRoundRobin"
+        id: "weighted-round-robin-root"
+        targets: 
+          - address: http://localhost:8091
+            weight: 3
+          - address: http://localhost:8092
+            weight: 2
+          - address: http://localhost:8093
+            weight: 1

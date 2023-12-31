@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,66 +11,12 @@ func Test_Sample(t *testing.T) {
 
 	LbService = LoadBalancerService{}
 
-	yaml := `listeners:
-  - protocol: http
-    port: 8080
-    ssl_certificate:
-    ssl_certificate_key:
-    routes:
-      - routeprefix: "/"
-        mode: "RoundRobin"
-        id: "round-robin-root"
-        customHeaders:
-          - method: "any"
-            headers:
-              - name: "Forwarded-Protocol"
-                value: "[[protocol]]"
-              - name: "Forwarded-Host"
-                value: "[[client.host]]"
-              - name: "Forwarded-tls"
-                value: "[[tls.version]]"
-              - name: "Custom-Header"
-                value: "custom-value"
-              - name: "Forwarded-By"
-                value: "[[balancer.id]]"
-        targets: 
-          - address: http://localhost:8091
-          - address: http://localhost:8092
-          - address: http://localhost:8093
-      - routeprefix: "/health"
-        mode: "RoundRobin"
-        id: "round-robin-health"
-        customHeaders:
-          - method: "any"
-            headers:
-              - name: "Forwarded-By"
-                value: "[[balancer.id]]"
-        targets: 
-          - address: http://localhost:8091
-          - address: http://localhost:8092
-          - address: http://localhost:8093
-  - protocol: http
-    port: 8081
-    ssl_certificate:
-    ssl_certificate_key:
-    routes:
-      - routeprefix: "/"
-        mode: "WeightedRoundRobin"
-        id: "weighted-round-robin-root"
-        targets: 
-          - address: http://localhost:8091
-            weight: 3
-          - address: http://localhost:8092
-            weight: 2
-          - address: http://localhost:8093
-            weight: 1
-`
 	RoundRobinBalancerURL := "http://localhost:8080/"
 	WeightedRoundRobinBalancerURL := "http://localhost:8081/"
 
 	config := &LoadBalancerServiceParams{
-		DebugMode:        true,
-		YAMLConfigString: yaml,
+		DebugMode:          true,
+		YAMLConfigFilePath: "examples/02_Test_mixed_config.yaml",
 	}
 
 	LbService.SetParams(config)
@@ -78,6 +25,7 @@ func Test_Sample(t *testing.T) {
 	// Start Test Servers
 	StartTestServers(3)
 
+	// Check basic configuration
 	t.Run("Check basic balancer config: Round Robin", func(t *testing.T) {
 		TestData := []int{1, 2, 3, 1, 2, 3, 1}
 		for _, expectedReplicaId := range TestData {
@@ -98,12 +46,46 @@ func Test_Sample(t *testing.T) {
 		}
 	})
 
+	// Check Headers
 	t.Run("Check custom headers : static", func(t *testing.T) {
 		body := new(TestServerDummyResponse)
 		expectedValue := "custom-value"
-		_ = doHTTPGetRequest(WeightedRoundRobinBalancerURL, body)
-		actualHeaderValue := body.Headers
+		_ = doHTTPGetRequest(RoundRobinBalancerURL, body)
+		actualHeaderValue := body.Headers["Custom-Header"]
 		assert.Equal(t, expectedValue, actualHeaderValue, "Static custom headers feature is not working")
+	})
+
+	t.Run("Check custom headers : dynamic", func(t *testing.T) {
+		TestData := map[string]string{
+			"Forwarded-Protocol": "HTTP/1.1",
+			"Forwarded-Host":     "localhost:8080",
+			"Forwarded-By":       "round-robin-root",
+			"Forwarded-tls":      "",
+		}
+		body := new(TestServerDummyResponse)
+		_ = doHTTPGetRequest(RoundRobinBalancerURL, body)
+		for headerKey, headerValue := range TestData {
+			assert.Equal(t, headerValue, body.Headers[headerKey], fmt.Sprintf("Value for the header '%v' is not matching", headerKey))
+		}
+	})
+
+	// Check route prefix
+	// NOTE: For this test to work, "custom header : dyanmic headers" test must be passed.
+	t.Run("Check route prefix feature", func(t *testing.T) {
+		TestData := [][]string{
+			{RoundRobinBalancerURL, "round-robin-root"},
+			{RoundRobinBalancerURL, "round-robin-root"},
+			{RoundRobinBalancerURL + "health", "round-robin-health"},
+			{RoundRobinBalancerURL, "round-robin-root"},
+			{RoundRobinBalancerURL + "test", "round-robin-root"},
+			{WeightedRoundRobinBalancerURL, ""}, // Custom headers not specified in YAML
+		}
+		for _, testRecord := range TestData {
+			body := new(TestServerDummyResponse)
+			res := doHTTPGetRequest(testRecord[0], body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, testRecord[1], body.Headers["Forwarded-By"])
+		}
 	})
 
 	LbService.Stop()

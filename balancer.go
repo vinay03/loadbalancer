@@ -76,11 +76,13 @@ func (lb *Balancer) _parseCustomHeaderValue(header *CustomHeader, req *http.Requ
 }
 
 func (lb *Balancer) AddCustomHeaders(req *http.Request) {
+	headersSetCounter := 0
 	if len(lb.CustomHeaderRules) > 0 {
 		for _, rule := range lb.CustomHeaderRules {
 			if rule.Method == "any" || req.Method == rule.Method {
 				for _, header := range rule.Headers {
 					req.Header.Set(header.Name, lb._parseCustomHeaderValue(&header, req))
+					headersSetCounter++
 				}
 			}
 		}

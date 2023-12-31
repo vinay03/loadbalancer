@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,8 +20,11 @@ type TestServerDummyResponse struct {
 	Headers   map[string]string `json:"_headers"`
 }
 
-func GetNumberedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Request) {
+func GetNumberedHandler(ReplicaNumber int, delayInterval time.Duration) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
+		if delayInterval > 0 {
+			time.Sleep(delayInterval)
+		}
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
 
@@ -37,39 +39,6 @@ func GetNumberedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Reque
 			}
 		}
 		json.NewEncoder(rw).Encode(response)
-	}
-}
-
-func GetDelayedHandler(ReplicaNumber int) func(http.ResponseWriter, *http.Request) {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		// log.Println("Starting wait...")
-		time.Sleep(20 * time.Second)
-		// log.Println("ending wait...")
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		response := TestServerDummyResponse{
-			Message:   fmt.Sprintf("Response to URI '%v' from Replica #%v", req.URL, ReplicaNumber),
-			ReplicaId: ReplicaNumber,
-		}
-		response.Headers = make(map[string]string)
-		for name, values := range req.Header {
-			for _, value := range values {
-				response.Headers[name] = value
-			}
-		}
-		json.NewEncoder(rw).Encode(response)
-	}
-}
-
-func getHealthHandlerFunc() func(http.ResponseWriter, *http.Request) {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("Content-Type", "application/json")
-		rw.WriteHeader(http.StatusOK)
-		json.NewEncoder(rw).Encode(struct {
-			active bool
-		}{
-			active: true,
-		})
 	}
 }
 
@@ -82,9 +51,7 @@ func StartTestServers(replicasCount int) {
 	TestServersSync := &sync.WaitGroup{}
 	TestServersSync.Add(replicasCount)
 
-	// for ReplicaNumber := 1; ReplicaNumber <= replicasCount; ReplicaNumber++ {
 	for index, srv := range TestServersPool {
-		// srv := http.Server{}
 		srv = &http.Server{}
 		TestServersPool[index] = srv
 		ReplicaNumber := index + 1
@@ -92,14 +59,11 @@ func StartTestServers(replicasCount int) {
 		srv.Addr = fmt.Sprintf(":%v", port)
 		router := &mux.Router{}
 
-		handlerFunc := GetNumberedHandler(ReplicaNumber)
+		handlerFunc := GetNumberedHandler(ReplicaNumber, 0)
 		router.HandleFunc("/", handlerFunc).Methods("GET")
-		router.HandleFunc("/:path", handlerFunc).Methods("GET")
+		router.HandleFunc("/{path}", handlerFunc).Methods("GET")
 
-		healthHandlerFunc := getHealthHandlerFunc()
-		router.HandleFunc("/health", healthHandlerFunc).Methods("GET")
-
-		delayedHandlerFunc := GetDelayedHandler(ReplicaNumber)
+		delayedHandlerFunc := GetNumberedHandler(ReplicaNumber, 3)
 		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET")
 
 		srv.Handler = router
@@ -135,14 +99,6 @@ func TestServerCheckState(requestURL string, TestServerSync *sync.WaitGroup) {
 			break
 		}
 	}
-}
-
-func YAMLLine(step int, content string) (line string) {
-	if step > 0 {
-		line += strings.Repeat("  ", step)
-	}
-	line += content + "\n"
-	return line
 }
 
 func StopTestServers() {
