@@ -46,9 +46,10 @@ func (lbs *LoadBalancerService) SetParams(config *LoadBalancerServiceParams) {
 	lbs.Params = config
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	if lbs.Params.DebugMode {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{
@@ -82,6 +83,7 @@ func (lbs *LoadBalancerService) Apply() {
 			Srv: http.Server{
 				Addr: ":" + listenerCnf.Port,
 			},
+			ListenerWG: &sync.WaitGroup{},
 		}
 
 		for _, route := range listenerCnf.Routes {
@@ -109,9 +111,12 @@ func (lbs *LoadBalancerService) Apply() {
 	}
 
 	// start all listeners
+	startersSync := &sync.WaitGroup{}
+	startersSync.Add(len(lbs.Listeners))
 	for _, lblistener := range lbs.Listeners {
-		lblistener.Start()
+		lblistener.Start(startersSync)
 	}
+	startersSync.Wait()
 }
 
 func (lbs *LoadBalancerService) Stop() {

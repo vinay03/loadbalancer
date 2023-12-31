@@ -76,11 +76,13 @@ func (lb *Balancer) _parseCustomHeaderValue(header *CustomHeader, req *http.Requ
 }
 
 func (lb *Balancer) AddCustomHeaders(req *http.Request) {
+	headersSetCounter := 0
 	if len(lb.CustomHeaderRules) > 0 {
 		for _, rule := range lb.CustomHeaderRules {
 			if rule.Method == "any" || req.Method == rule.Method {
 				for _, header := range rule.Headers {
 					req.Header.Set(header.Name, lb._parseCustomHeaderValue(&header, req))
+					headersSetCounter++
 				}
 			}
 		}
@@ -96,7 +98,7 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 		Str("uri", req.RequestURI).
 		Str("balancer", lb.Id).
 		Str("to", target.Address).
-		Msg("Forwarding request")
+		Msg("- Forwarding request")
 
 	lb.liveConnections.Add(1)
 	// Add Custom headers if matches any
