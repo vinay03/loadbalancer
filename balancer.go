@@ -43,10 +43,16 @@ type Balancer struct {
 var LoadBalancersPool map[string]*Balancer
 
 func (lb *Balancer) SetBalancerLogic() {
-	if lb.Mode == LB_MODE_ROUNDROBIN {
+
+	switch lb.Mode {
+	case LB_MODE_ROUNDROBIN:
 		lb.Logic = &RoundRobinLogic{}
-	} else if lb.Mode == LB_MODE_WEIGHTED_ROUNDROBIN {
+	case LB_MODE_WEIGHTED_ROUNDROBIN:
 		lb.Logic = &WeightedRoundRobinLogic{}
+	case LB_MODE_RANDOM:
+		lb.Logic = &RandomLogic{}
+	default:
+		log.Error().Msgf("Balancer mode '%v' is not supported.", lb.Mode)
 	}
 
 	// Initialize Balancer logic

@@ -58,6 +58,7 @@ var supportedListenerProtocols []string = []string{
 }
 
 var supportedBalancers []string = []string{
+	LB_MODE_RANDOM,
 	LB_MODE_ROUNDROBIN, LB_MODE_WEIGHTED_ROUNDROBIN,
 }
 

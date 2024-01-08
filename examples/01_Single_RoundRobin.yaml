@@ -35,9 +35,9 @@ listeners:
             weight: 2
           - address: http://localhost:8096
             weight: 1
-      - routeprefix: "/health"
-        id: "health"
-        mode: "RoundRobin"
+      - routeprefix: "/random"
+        id: "random"
+        mode: "Random"
         targets: 
           - address: http://localhost:8091
           - address: http://localhost:8093
