@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,6 +58,31 @@ func Test_Sample(t *testing.T) {
 			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets)
 			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
 		}
+	})
+
+	t.Run("Check basic balancer config: Least Connections Logic", func(t *testing.T) {
+		body := new(TestServerDummyResponse)
+		reqeustsSync := &sync.WaitGroup{}
+
+		reqeustsSync.Add(1)
+		go func(requestsSync *sync.WaitGroup) {
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 2 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, 1, body.ReplicaId)
+			requestsSync.Done()
+		}(reqeustsSync)
+
+		time.Sleep(500 * time.Millisecond)
+		start := time.Now()
+		for i := 0; i < 4; i++ {
+			body := new(TestServerDummyResponse)
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 0 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, 2, body.ReplicaId)
+		}
+		log.Info().Msgf("\n\nTime took %s\n\n", time.Since(start))
+
+		reqeustsSync.Wait()
 	})
 
 	// Check Headers

@@ -37,7 +37,7 @@ func (rl *RandomLogic) Next(lb *Balancer) *Target {
 	case <-time.After(lb.TargetWaitTimeout):
 		log.Info().
 			Str("balancer", lb.Id).
-			Str("mode", LB_MODE_RANDOM).
+			Str("mode", lb.Mode).
 			Msg("Request is timing out due to no available targets.")
 		return nil
 	case target := <-successTarget:
@@ -74,7 +74,7 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 	case <-time.After(lb.TargetWaitTimeout):
 		log.Info().
 			Str("balancer", lb.Id).
-			Str("mode", LB_MODE_ROUNDROBIN).
+			Str("mode", lb.Mode).
 			Msg("Request is timing out due to no available targets.")
 		return nil
 	case target := <-successTarget:
@@ -118,7 +118,44 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 	case <-time.After(lb.TargetWaitTimeout):
 		log.Info().
 			Str("balancer", lb.Id).
-			Str("mode", LB_MODE_WEIGHTED_ROUNDROBIN).
+			Str("mode", lb.Mode).
+			Msg("Request is timing out due to no available targets.")
+		return nil
+	case target := <-successTarget:
+		return target
+	}
+}
+
+/******* Least Connections Logic ********/
+
+type LeastConnectionsLogic struct {
+}
+
+func (lc *LeastConnectionsLogic) Init() {
+
+}
+
+func (lc *LeastConnectionsLogic) Next(lb *Balancer) *Target {
+	var successTarget = make(chan *Target, 1)
+	go func() {
+		for {
+			minTarget := lb.Targets[0]
+			for _, nextTarget := range lb.Targets[1:] {
+				if nextTarget.Connections < minTarget.Connections {
+					minTarget = nextTarget
+				}
+			}
+			if minTarget.IsAlive() {
+				successTarget <- minTarget
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(lb.TargetWaitTimeout):
+		log.Info().
+			Str("balancer", lb.Id).
+			Str("mode", lb.Mode).
 			Msg("Request is timing out due to no available targets.")
 		return nil
 	case target := <-successTarget:

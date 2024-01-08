@@ -51,6 +51,8 @@ func (lb *Balancer) SetBalancerLogic() {
 		lb.Logic = &WeightedRoundRobinLogic{}
 	case LB_MODE_RANDOM:
 		lb.Logic = &RandomLogic{}
+	case LB_MODE_LEAST_CONNECTIONS:
+		lb.Logic = &LeastConnectionsLogic{}
 	default:
 		log.Error().Msgf("Balancer mode '%v' is not supported.", lb.Mode)
 	}

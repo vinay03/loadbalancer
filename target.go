@@ -12,9 +12,10 @@ import (
 )
 
 type Target struct {
-	Address string
-	proxy   *httputil.ReverseProxy
-	Weight  int
+	Address     string
+	proxy       *httputil.ReverseProxy
+	Weight      int
+	Connections int64
 }
 
 type TargetYAMLConfig struct {
@@ -58,5 +59,7 @@ func (s *Target) IsAlive() bool {
 	return true
 }
 func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) {
+	s.Connections++
 	s.proxy.ServeHTTP(rw, req)
+	s.Connections--
 }
