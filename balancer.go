@@ -55,12 +55,6 @@ func (lb *Balancer) SetBalancerLogic() {
 		log.Error().Msgf("Balancer mode '%v' is not supported.", lb.Mode)
 	}
 
-	if lb.Mode == LB_MODE_ROUNDROBIN {
-		lb.Logic = &RoundRobinLogic{}
-	} else if lb.Mode == LB_MODE_WEIGHTED_ROUNDROBIN {
-		lb.Logic = &WeightedRoundRobinLogic{}
-	}
-
 	// Initialize Balancer logic
 	if lb.Logic != nil {
 		lb.Logic.Init()
