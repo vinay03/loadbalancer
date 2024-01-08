@@ -42,6 +42,13 @@ listeners:
           - address: http://localhost:8091
           - address: http://localhost:8093
           - address: http://localhost:8095
+      - routeprefix: "/least-connections"
+        id: "leastconnections"
+        mode: "LeastConnections"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
   - protocol: http
     port: 8081
     ssl_certificate:
