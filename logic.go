@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -9,6 +10,39 @@ import (
 type BalancerLogic interface {
 	Next(lb *Balancer) *Target
 	Init()
+}
+
+/****** Random Logic ******/
+type RandomLogic struct{}
+
+func (rl *RandomLogic) Init() {
+
+}
+
+func (rl *RandomLogic) Next(lb *Balancer) *Target {
+	targetsLength := len(lb.Targets)
+	randomIndex := rand.Intn(targetsLength)
+
+	var successTarget = make(chan *Target, 1)
+	go func() {
+		for {
+			target := lb.Targets[randomIndex]
+			if target.IsAlive() {
+				successTarget <- target
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(lb.TargetWaitTimeout):
+		log.Info().
+			Str("balancer", lb.Id).
+			Str("mode", LB_MODE_RANDOM).
+			Msg("Request is timing out due to no available targets.")
+		return nil
+	case target := <-successTarget:
+		return target
+	}
 }
 
 /****** Round Robin *******/

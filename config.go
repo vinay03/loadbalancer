@@ -41,6 +41,7 @@ const (
 	LB_MODE_ROUNDROBIN          = "RoundRobin"
 	LB_MODE_WEIGHTED_ROUNDROBIN = "WeightedRoundRobin"
 	LB_MODE_PERFORMANCE_BASED   = "PerformanceBased"
+	LB_MODE_LEAST_CONNECTIONS   = "LeastConnections"
 
 	AUTO_GENERATED_BALANCER_ID_LENGTH = 10
 
@@ -58,6 +59,7 @@ var supportedListenerProtocols []string = []string{
 }
 
 var supportedBalancers []string = []string{
+	LB_MODE_RANDOM,
 	LB_MODE_ROUNDROBIN, LB_MODE_WEIGHTED_ROUNDROBIN,
 }
 

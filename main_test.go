@@ -11,8 +11,8 @@ func Test_Sample(t *testing.T) {
 
 	LbService = LoadBalancerService{}
 
-	RoundRobinBalancerURL := "http://localhost:8080/"
-	WeightedRoundRobinBalancerURL := "http://localhost:8081/"
+	Lister1_URL := "http://localhost:8080/"
+	Lister2_URL := "http://localhost:8081/"
 
 	config := &LoadBalancerServiceParams{
 		DebugMode:          true,
@@ -30,7 +30,7 @@ func Test_Sample(t *testing.T) {
 		TestData := []int{1, 2, 3, 1, 2, 3, 1}
 		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
-			res := doHTTPGetRequest(RoundRobinBalancerURL, body)
+			res := doHTTPGetRequest(Lister1_URL, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
 			assert.Equal(t, expectedReplicaId, body.ReplicaId)
 		}
@@ -40,9 +40,20 @@ func Test_Sample(t *testing.T) {
 		TestData := []int{1, 1, 1, 2, 2, 3, 1, 1, 1, 2, 2, 3, 1, 1, 1}
 		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
-			res := doHTTPGetRequest(WeightedRoundRobinBalancerURL, body)
+			res := doHTTPGetRequest(Lister2_URL, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
 			assert.Equal(t, expectedReplicaId, body.ReplicaId)
+		}
+	})
+
+	t.Run("Check basic balancer config: Random Balancer", func(t *testing.T) {
+		totalTargets := 3
+		for i := 0; i < 12; i++ {
+			body := new(TestServerDummyResponse)
+			res := doHTTPGetRequest(Lister1_URL+"random", body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets)
+			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
 		}
 	})
 
@@ -50,7 +61,7 @@ func Test_Sample(t *testing.T) {
 	t.Run("Check custom headers : static", func(t *testing.T) {
 		body := new(TestServerDummyResponse)
 		expectedValue := "custom-value"
-		_ = doHTTPGetRequest(RoundRobinBalancerURL, body)
+		_ = doHTTPGetRequest(Lister1_URL, body)
 		actualHeaderValue := body.Headers["Custom-Header"]
 		assert.Equal(t, expectedValue, actualHeaderValue, "Static custom headers feature is not working")
 	})
@@ -63,7 +74,7 @@ func Test_Sample(t *testing.T) {
 			"Forwarded-tls":      "",
 		}
 		body := new(TestServerDummyResponse)
-		_ = doHTTPGetRequest(RoundRobinBalancerURL, body)
+		_ = doHTTPGetRequest(Lister1_URL, body)
 		for headerKey, headerValue := range TestData {
 			assert.Equal(t, headerValue, body.Headers[headerKey], fmt.Sprintf("Value for the header '%v' is not matching", headerKey))
 		}
@@ -73,12 +84,13 @@ func Test_Sample(t *testing.T) {
 	// NOTE: For this test to work, "custom header : dyanmic headers" test must be passed.
 	t.Run("Check route prefix feature", func(t *testing.T) {
 		TestData := [][]string{
-			{RoundRobinBalancerURL, "round-robin-root"},
-			{RoundRobinBalancerURL, "round-robin-root"},
-			{RoundRobinBalancerURL + "health", "round-robin-health"},
-			{RoundRobinBalancerURL, "round-robin-root"},
-			{RoundRobinBalancerURL + "test", "round-robin-root"},
-			{WeightedRoundRobinBalancerURL, ""}, // Custom headers not specified in YAML
+			{Lister1_URL, "round-robin-root"},
+			{Lister1_URL, "round-robin-root"},
+			{Lister1_URL + "health", "round-robin-health"},
+			{Lister1_URL, "round-robin-root"},
+			{Lister1_URL + "test", "round-robin-root"},
+			{Lister1_URL + "random", "random-logic"},
+			{Lister2_URL, ""}, // Custom headers not specified in YAML
 		}
 		for _, testRecord := range TestData {
 			body := new(TestServerDummyResponse)
