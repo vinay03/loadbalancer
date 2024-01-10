@@ -37,11 +37,12 @@ const (
 	LS_PROTOCOL_HTTPS = "https"
 
 	// Balancer Modes
-	LB_MODE_RANDOM                   = "Random"
-	LB_MODE_ROUNDROBIN               = "RoundRobin"
-	LB_MODE_WEIGHTED_ROUNDROBIN      = "WeightedRoundRobin"
-	LB_MODE_PERFORMANCE_BASED        = "PerformanceBased"
-	LB_MODE_LEAST_CONNECTIONS_RANDOM = "LeastConnectionsRandom"
+	LB_MODE_RANDOM                       = "Random"
+	LB_MODE_ROUNDROBIN                   = "RoundRobin"
+	LB_MODE_WEIGHTED_ROUNDROBIN          = "WeightedRoundRobin"
+	LB_MODE_PERFORMANCE_BASED            = "PerformanceBased"
+	LB_MODE_LEAST_CONNECTIONS_RANDOM     = "LeastConnectionsRandom"
+	LB_MODE_LEAST_CONNECTIONS_ROUNDROBIN = "LeastConnectionsRoundRobin"
 
 	AUTO_GENERATED_BALANCER_ID_LENGTH = 10
 
@@ -61,7 +62,7 @@ var supportedListenerProtocols []string = []string{
 var supportedBalancers []string = []string{
 	LB_MODE_RANDOM,
 	LB_MODE_ROUNDROBIN, LB_MODE_WEIGHTED_ROUNDROBIN,
-	LB_MODE_LEAST_CONNECTIONS_RANDOM,
+	LB_MODE_LEAST_CONNECTIONS_RANDOM, LB_MODE_LEAST_CONNECTIONS_ROUNDROBIN,
 }
 
 const (
