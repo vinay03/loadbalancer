@@ -33,7 +33,7 @@ func GetNumberedHandler(ReplicaNumber int, defaultDelayInterval time.Duration) f
 			if err != nil {
 				log.Error().Msg(err.Error())
 			}
-			if t.Delay > 0 {
+			if t.Delay >= 0 {
 				delayInterval = time.Duration(t.Delay) * time.Second
 			}
 		}
@@ -77,9 +77,9 @@ func StartTestServers(replicasCount int) {
 		srv.Addr = fmt.Sprintf(":%v", port)
 		router := &mux.Router{}
 
-		handlerFunc := GetNumberedHandler(ReplicaNumber, 0)
+		handlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
 		router.HandleFunc("/", handlerFunc).Methods("GET")
-		router.HandleFunc("/{path}", handlerFunc).Methods("GET")
+		router.HandleFunc("/{path}", handlerFunc).Methods("GET", "POST")
 
 		delayedHandlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
 		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET", "POST")

@@ -29,6 +29,7 @@ func (rl *RandomLogic) Next(lb *Balancer) *Target {
 			target := lb.Targets[randomIndex]
 			if target.IsAlive() {
 				successTarget <- target
+				return
 			}
 		}
 	}()
@@ -65,7 +66,7 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 			if target.IsAlive() {
 				rbl.Counter = rbl.Counter % targetCount
 				successTarget <- target
-				break
+				return
 			}
 		}
 	}()
@@ -97,7 +98,7 @@ func (wrbl *WeightedRoundRobinLogic) Init() {
 func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 	targetCount := len(lb.Targets)
 
-	var successTarget = make(chan *Target, 1)
+	successTarget := make(chan *Target, 1)
 	go func() {
 		for {
 			target := lb.Targets[wrbl.Counter%targetCount]
@@ -107,9 +108,9 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 				wrbl.WeightCounter = 0
 			}
 			if target.IsAlive() {
-				wrbl.Counter = wrbl.Counter % targetCount
+				wrbl.Counter %= targetCount
 				successTarget <- target
-				break
+				return
 			}
 		}
 	}()
@@ -128,35 +129,42 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 
 /******* Least Connections Logic ********/
 
-type LeastConnectionsLogic struct {
+type LeastConnectionsRandomLogic struct {
 }
 
-func (lc *LeastConnectionsLogic) Init() {
+func (lc *LeastConnectionsRandomLogic) Init() {
 
 }
 
-func (lc *LeastConnectionsLogic) Next(lb *Balancer) *Target {
+func (lc *LeastConnectionsRandomLogic) Next(lb *Balancer) *Target {
 	var successTarget = make(chan *Target, 1)
 	go func() {
-		for {
-			minTarget := lb.Targets[0]
-			for _, nextTarget := range lb.Targets[1:] {
-				if nextTarget.Connections < minTarget.Connections {
-					minTarget = nextTarget
+		pool := []*Target{}
+
+		minTarget := lb.Targets[0]
+		pool = append(pool, minTarget)
+
+		for _, nextTarget := range lb.Targets[1:] {
+			if nextTarget.Connections < minTarget.Connections {
+				minTarget = nextTarget
+				pool = []*Target{
+					minTarget,
 				}
-			}
-			if minTarget.IsAlive() {
-				successTarget <- minTarget
+			} else if nextTarget.Connections == minTarget.Connections {
+				pool = append(pool, nextTarget)
 			}
 		}
+		poolSize := len(pool)
+		if poolSize > 1 {
+			randIndex := rand.Intn(poolSize)
+			minTarget = pool[randIndex]
+		}
+		successTarget <- minTarget
 	}()
 
 	select {
 	case <-time.After(lb.TargetWaitTimeout):
-		log.Info().
-			Str("balancer", lb.Id).
-			Str("mode", lb.Mode).
-			Msg("Request is timing out due to no available targets.")
+		log.Info().Str("balancer", lb.Id).Str("mode", lb.Mode).Msg("Request is timing out due to no available targets.")
 		return nil
 	case target := <-successTarget:
 		return target

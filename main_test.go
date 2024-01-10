@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,29 +59,36 @@ func Test_Sample(t *testing.T) {
 		}
 	})
 
-	t.Run("Check basic balancer config: Least Connections Logic", func(t *testing.T) {
+	t.Run("Check basic balancer config: Least Connections Random Logic", func(t *testing.T) {
 		body := new(TestServerDummyResponse)
-		reqeustsSync := &sync.WaitGroup{}
+		requestsEndSync := &sync.WaitGroup{}
+		requestsStartSync := &sync.WaitGroup{}
 
-		reqeustsSync.Add(1)
-		go func(requestsSync *sync.WaitGroup) {
-			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 2 }`, body)
+		totalTargets := 3
+		longRequestReplicaNumber := -1
+
+		requestsEndSync.Add(1)
+		requestsStartSync.Add(1)
+		go func(requestsEndSync *sync.WaitGroup) {
+			requestsStartSync.Done()
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 1 }`, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
-			assert.Equal(t, 1, body.ReplicaId)
-			requestsSync.Done()
-		}(reqeustsSync)
+			longRequestReplicaNumber = body.ReplicaId
+			requestsEndSync.Done()
+		}(requestsEndSync)
 
-		time.Sleep(500 * time.Millisecond)
-		start := time.Now()
-		for i := 0; i < 4; i++ {
+		requestsStartSync.Wait()
+		time.Sleep(100 * time.Millisecond)
+
+		for i := 0; i < 10; i++ {
 			body := new(TestServerDummyResponse)
 			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 0 }`, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
-			assert.Equal(t, 2, body.ReplicaId)
+			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets && body.ReplicaId != longRequestReplicaNumber)
+			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
 		}
-		log.Info().Msgf("\n\nTime took %s\n\n", time.Since(start))
 
-		reqeustsSync.Wait()
+		requestsEndSync.Wait()
 	})
 
 	// Check Headers
