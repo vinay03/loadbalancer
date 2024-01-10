@@ -24,8 +24,8 @@ jobs:
     - name: Display Go version
       run: go version
 
-    - name: Build
-      run: go build -o lbalancer .
-
     - name: Test
       run: go test .
+
+    - name: Build
+      run: go build -o lbalancer .
