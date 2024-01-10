@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -55,6 +57,38 @@ func Test_Sample(t *testing.T) {
 			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets)
 			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
 		}
+	})
+
+	t.Run("Check basic balancer config: Least Connections Random Logic", func(t *testing.T) {
+		body := new(TestServerDummyResponse)
+		requestsEndSync := &sync.WaitGroup{}
+		requestsStartSync := &sync.WaitGroup{}
+
+		totalTargets := 3
+		longRequestReplicaNumber := -1
+
+		requestsEndSync.Add(1)
+		requestsStartSync.Add(1)
+		go func(requestsEndSync *sync.WaitGroup) {
+			requestsStartSync.Done()
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 1 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			longRequestReplicaNumber = body.ReplicaId
+			requestsEndSync.Done()
+		}(requestsEndSync)
+
+		requestsStartSync.Wait()
+		time.Sleep(100 * time.Millisecond)
+
+		for i := 0; i < 10; i++ {
+			body := new(TestServerDummyResponse)
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 0 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets && body.ReplicaId != longRequestReplicaNumber)
+			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
+		}
+
+		requestsEndSync.Wait()
 	})
 
 	// Check Headers

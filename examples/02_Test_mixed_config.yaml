@@ -49,6 +49,13 @@ listeners:
           - address: http://localhost:8091
           - address: http://localhost:8092
           - address: http://localhost:8093
+      - routeprefix: "/delayed"
+        id: "leastconnections"
+        mode: "LeastConnectionsRandom"
+        targets: 
+          - address: http://localhost:8091
+          - address: http://localhost:8092
+          - address: http://localhost:8093
   - protocol: http
     port: 8081
     ssl_certificate:

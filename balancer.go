@@ -51,6 +51,8 @@ func (lb *Balancer) SetBalancerLogic() {
 		lb.Logic = &WeightedRoundRobinLogic{}
 	case LB_MODE_RANDOM:
 		lb.Logic = &RandomLogic{}
+	case LB_MODE_LEAST_CONNECTIONS_RANDOM:
+		lb.Logic = &LeastConnectionsRandomLogic{}
 	default:
 		log.Error().Msgf("Balancer mode '%v' is not supported.", lb.Mode)
 	}
@@ -100,11 +102,7 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	if target == nil {
 		return
 	}
-	log.Debug().
-		Str("uri", req.RequestURI).
-		Str("balancer", lb.Id).
-		Str("to", target.Address).
-		Msg("- Forwarding request")
+	log.Debug().Str("uri", req.RequestURI).Str("balancer", lb.Id).Str("to", target.Address).Msg("- Forwarding request")
 
 	lb.liveConnections.Add(1)
 	// Add Custom headers if matches any

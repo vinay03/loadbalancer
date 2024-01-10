@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,10 +21,27 @@ type TestServerDummyResponse struct {
 	Headers   map[string]string `json:"_headers"`
 }
 
-func GetNumberedHandler(ReplicaNumber int, delayInterval time.Duration) func(http.ResponseWriter, *http.Request) {
+func GetNumberedHandler(ReplicaNumber int, defaultDelayInterval time.Duration) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
+		delayInterval := defaultDelayInterval
+
+		if req.Method == "POST" {
+			var t struct {
+				Delay int `json:"delay"`
+			}
+			err := json.NewDecoder(req.Body).Decode(&t)
+			if err != nil {
+				log.Error().Msg(err.Error())
+			}
+			if t.Delay >= 0 {
+				delayInterval = time.Duration(t.Delay) * time.Second
+			}
+		}
+
 		if delayInterval > 0 {
+			log.Info().Msgf("Waiting for %v", delayInterval)
 			time.Sleep(delayInterval)
+			log.Info().Msgf("Wait for %v completed", delayInterval)
 		}
 		rw.Header().Set("Content-Type", "application/json")
 		rw.WriteHeader(http.StatusOK)
@@ -59,12 +77,12 @@ func StartTestServers(replicasCount int) {
 		srv.Addr = fmt.Sprintf(":%v", port)
 		router := &mux.Router{}
 
-		handlerFunc := GetNumberedHandler(ReplicaNumber, 0)
+		handlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
 		router.HandleFunc("/", handlerFunc).Methods("GET")
-		router.HandleFunc("/{path}", handlerFunc).Methods("GET")
+		router.HandleFunc("/{path}", handlerFunc).Methods("GET", "POST")
 
-		delayedHandlerFunc := GetNumberedHandler(ReplicaNumber, 3)
-		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET")
+		delayedHandlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
+		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET", "POST")
 
 		srv.Handler = router
 		url := "http://localhost" + srv.Addr + "/"
@@ -113,6 +131,29 @@ func doHTTPGetRequest(requestURL string, v any) *http.Response {
 		fmt.Printf("error making http request: %s\n", err)
 		os.Exit(1)
 	}
+	json.NewDecoder(res.Body).Decode(v)
+	return res
+}
+
+func doHTTPPostRequest(requestURL string, postData string, v any) *http.Response {
+	body := []byte(postData)
+
+	// Create a HTTP post request
+	req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(body))
+	if err != nil {
+		panic(err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	defer res.Body.Close()
+
 	json.NewDecoder(res.Body).Decode(v)
 	return res
 }
