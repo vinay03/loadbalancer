@@ -170,3 +170,17 @@ func (lc *LeastConnectionsRandomLogic) Next(lb *Balancer) *Target {
 		return target
 	}
 }
+
+/******* Least Connections RoundRobin Logic ********/
+
+type LeastConnectionsRoundRobinLogic struct {
+	Counter int
+}
+
+func (lc *LeastConnectionsRoundRobinLogic) Init() {
+	lc.Counter = 0
+}
+
+func (lc *LeastConnectionsRoundRobinLogic) Next(lb *Balancer) *Target {
+
+}
