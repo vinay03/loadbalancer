@@ -182,5 +182,36 @@ func (lc *LeastConnectionsRoundRobinLogic) Init() {
 }
 
 func (lc *LeastConnectionsRoundRobinLogic) Next(lb *Balancer) *Target {
+	var successTarget = make(chan *Target, 1)
+	go func() {
+		pool := []*Target{}
 
+		minTarget := lb.Targets[0]
+		pool = append(pool, minTarget)
+
+		for _, nextTarget := range lb.Targets[1:] {
+			if nextTarget.Connections < minTarget.Connections {
+				minTarget = nextTarget
+				pool = []*Target{
+					minTarget,
+				}
+			} else if nextTarget.Connections == minTarget.Connections {
+				pool = append(pool, nextTarget)
+			}
+		}
+		poolSize := len(pool)
+		if poolSize > 1 {
+			randIndex := rand.Intn(poolSize)
+			minTarget = pool[randIndex]
+		}
+		successTarget <- minTarget
+	}()
+
+	select {
+	case <-time.After(lb.TargetWaitTimeout):
+		log.Info().Str("balancer", lb.Id).Str("mode", lb.Mode).Msg("Request is timing out due to no available targets.")
+		return nil
+	case target := <-successTarget:
+		return target
+	}
 }
