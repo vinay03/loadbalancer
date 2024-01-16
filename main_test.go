@@ -28,71 +28,69 @@ func Test_Sample(t *testing.T) {
 	// Start Test Servers
 	StartTestServers(3)
 
-	/*
-		// Check basic configuration
-		t.Run("Check basic balancer config: Round Robin", func(t *testing.T) {
-			TestData := []int{1, 2, 3, 1, 2, 3, 1}
-			for _, expectedReplicaId := range TestData {
-				body := new(TestServerDummyResponse)
-				res := doHTTPGetRequest(Lister1_URL, body)
-				assert.Equal(t, 200, res.StatusCode, "Request failed")
-				assert.Equal(t, expectedReplicaId, body.ReplicaId)
-			}
-		})
-
-		t.Run("Check Basic Balancer config: Weighted Round Robin", func(t *testing.T) {
-			TestData := []int{1, 1, 1, 2, 2, 3, 1, 1, 1, 2, 2, 3, 1, 1, 1}
-			for _, expectedReplicaId := range TestData {
-				body := new(TestServerDummyResponse)
-				res := doHTTPGetRequest(Lister2_URL, body)
-				assert.Equal(t, 200, res.StatusCode, "Request failed")
-				assert.Equal(t, expectedReplicaId, body.ReplicaId)
-			}
-		})
-
-		t.Run("Check basic balancer config: Random Balancer", func(t *testing.T) {
-			totalTargets := 3
-			for i := 0; i < 12; i++ {
-				body := new(TestServerDummyResponse)
-				res := doHTTPGetRequest(Lister1_URL+"random", body)
-				assert.Equal(t, 200, res.StatusCode, "Request failed")
-				replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets)
-				assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
-			}
-		})
-
-		t.Run("Check basic balancer config: Least Connections Random Logic", func(t *testing.T) {
+	// Check basic configuration
+	t.Run("Check basic balancer config: Round Robin", func(t *testing.T) {
+		TestData := []int{1, 2, 3, 1, 2, 3, 1}
+		for _, expectedReplicaId := range TestData {
 			body := new(TestServerDummyResponse)
-			requestsEndSync := &sync.WaitGroup{}
-			requestsStartSync := &sync.WaitGroup{}
+			res := doHTTPGetRequest(Lister1_URL, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, expectedReplicaId, body.ReplicaId)
+		}
+	})
 
-			totalTargets := 3
-			longRequestReplicaNumber := -1
+	t.Run("Check Basic Balancer config: Weighted Round Robin", func(t *testing.T) {
+		TestData := []int{1, 1, 1, 2, 2, 3, 1, 1, 1, 2, 2, 3, 1, 1, 1}
+		for _, expectedReplicaId := range TestData {
+			body := new(TestServerDummyResponse)
+			res := doHTTPGetRequest(Lister2_URL, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, expectedReplicaId, body.ReplicaId)
+		}
+	})
 
-			requestsEndSync.Add(1)
-			requestsStartSync.Add(1)
-			go func(requestsEndSync *sync.WaitGroup) {
-				requestsStartSync.Done()
-				res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 1 }`, body)
-				assert.Equal(t, 200, res.StatusCode, "Request failed")
-				longRequestReplicaNumber = body.ReplicaId
-				requestsEndSync.Done()
-			}(requestsEndSync)
+	t.Run("Check basic balancer config: Random Balancer", func(t *testing.T) {
+		totalTargets := 3
+		for i := 0; i < 12; i++ {
+			body := new(TestServerDummyResponse)
+			res := doHTTPGetRequest(Lister1_URL+"random", body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets)
+			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
+		}
+	})
 
-			requestsStartSync.Wait()
-			time.Sleep(100 * time.Millisecond)
+	t.Run("Check basic balancer config: Least Connections Random Logic", func(t *testing.T) {
+		body := new(TestServerDummyResponse)
+		requestsEndSync := &sync.WaitGroup{}
+		requestsStartSync := &sync.WaitGroup{}
 
-			for i := 0; i < 10; i++ {
-				body := new(TestServerDummyResponse)
-				res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 0 }`, body)
-				assert.Equal(t, 200, res.StatusCode, "Request failed")
-				replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets && body.ReplicaId != longRequestReplicaNumber)
-				assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
-			}
+		totalTargets := 3
+		longRequestReplicaNumber := -1
 
-			requestsEndSync.Wait()
-		})
-	*/
+		requestsEndSync.Add(1)
+		requestsStartSync.Add(1)
+		go func(requestsEndSync *sync.WaitGroup) {
+			requestsStartSync.Done()
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 1 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			longRequestReplicaNumber = body.ReplicaId
+			requestsEndSync.Done()
+		}(requestsEndSync)
+
+		requestsStartSync.Wait()
+		time.Sleep(100 * time.Millisecond)
+
+		for i := 0; i < 10; i++ {
+			body := new(TestServerDummyResponse)
+			res := doHTTPPostRequest(Lister1_URL+"delayed", `{ "delay": 0 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets && body.ReplicaId != longRequestReplicaNumber)
+			assert.Equal(t, true, replicaIdCheck, "Invalid balancing logic")
+		}
+
+		requestsEndSync.Wait()
+	})
 
 	t.Run("Check basic balancer config: Least Connections Round Robin Logic", func(t *testing.T) {
 		body := new(TestServerDummyResponse)
@@ -100,7 +98,6 @@ func Test_Sample(t *testing.T) {
 		requestsStartSync := &sync.WaitGroup{}
 
 		// totalTargets := 3
-		longRequestReplicaNumber := -1
 
 		requestsEndSync.Add(1)
 		requestsStartSync.Add(1)
@@ -109,8 +106,7 @@ func Test_Sample(t *testing.T) {
 			requestsStartSync.Done()
 			res := doHTTPPostRequest(Lister1_URL+"delayed-roundrobin", `{ "delay": 1 }`, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
-			longRequestReplicaNumber = body.ReplicaId
-			assert.Equal(t, 1, longRequestReplicaNumber, "Logic failed")
+			assert.Equal(t, 1, body.ReplicaId, "Logic failed")
 			requestsEndSync.Done()
 		}(requestsEndSync)
 
@@ -124,10 +120,10 @@ func Test_Sample(t *testing.T) {
 			res := doHTTPPostRequest(Lister1_URL+"delayed-roundrobin", `{ "delay": 0 }`, body)
 			assert.Equal(t, 200, res.StatusCode, "Request failed")
 			assert.Equal(t, checkReplicaId, body.ReplicaId, "Invalid balancing logic")
-			time.Sleep(2000 * time.Microsecond)
+			time.Sleep(20 * time.Millisecond)
 		}
 		log.Info().Msg("Waiting for long request to finish")
-		time.Sleep(1 * time.Second)
+		requestsEndSync.Wait()
 
 		// checkReplicaId = 1
 		checkData = []int{1, 2, 3, 1, 2, 3, 1, 2, 3, 1}
@@ -138,8 +134,6 @@ func Test_Sample(t *testing.T) {
 			assert.Equal(t, checkReplicaId, body.ReplicaId, "Invalid balancing logic")
 			time.Sleep(2000 * time.Microsecond)
 		}
-
-		requestsEndSync.Wait()
 	})
 
 	// Check Headers

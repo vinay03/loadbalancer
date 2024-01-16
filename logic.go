@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -174,65 +175,48 @@ func (lc *LeastConnectionsRandomLogic) Next(lb *Balancer) *Target {
 /******* Least Connections RoundRobin Logic ********/
 
 type LeastConnectionsRoundRobinLogic struct {
-	Counter int
+	mu        sync.Mutex
+	LastIndex int
 }
 
 func (lc *LeastConnectionsRoundRobinLogic) Init() {
-	lc.Counter = 0
+	lc.LastIndex = -1
 }
 
 func (lc *LeastConnectionsRoundRobinLogic) Next(lb *Balancer) *Target {
 	var successTarget = make(chan *Target, 1)
 	go func() {
-		// cursor := 0
-		// lb.Counter
-		// targetCount := len(lb.Targets)
-		pool := make(map[int]*Target)
-
+		var indexPool []int
 		var minTarget *Target
+
+		lc.mu.Lock()
+		defer lc.mu.Unlock()
 
 		for index, nextTarget := range lb.Targets {
 			if nextTarget.IsAlive() {
 				if minTarget == nil || nextTarget.Connections < minTarget.Connections {
 					minTarget = nextTarget
-					pool = make(map[int]*Target)
-					pool[index] = nextTarget
+					indexPool = []int{index}
 				} else if nextTarget.Connections == minTarget.Connections {
-					pool[index] = nextTarget
+					indexPool = append(indexPool, index)
 				}
 			}
-			// lc.Counter++
 		}
-		// fmt.Println(pool)
-		for index, target := range pool {
-			if index >= lc.Counter%len(lb.Targets) {
-				lc.Counter = index + 1
-				successTarget <- target
-				return
+		candidateTargetIndex := -1
+		if len(indexPool) > 0 {
+			for _, index := range indexPool {
+				if candidateTargetIndex == -1 {
+					candidateTargetIndex = index
+				}
+				if index > lc.LastIndex {
+					candidateTargetIndex = index
+					break
+				}
 			}
+			lc.LastIndex = candidateTargetIndex
+			successTarget <- lb.Targets[candidateTargetIndex]
+			return
 		}
-
-		// pool := []*Target{}
-
-		// minTarget := lb.Targets[0]
-		// pool = append(pool, minTarget)
-
-		// for _, nextTarget := range lb.Targets[1:] {
-		// 	if nextTarget.Connections < minTarget.Connections {
-		// 		minTarget = nextTarget
-		// 		pool = []*Target{
-		// 			minTarget,
-		// 		}
-		// 	} else if nextTarget.Connections == minTarget.Connections {
-		// 		pool = append(pool, nextTarget)
-		// 	}
-		// }
-		// poolSize := len(pool)
-		// if poolSize > 1 {
-		// 	randIndex := rand.Intn(poolSize)-
-		// 	minTarget = pool[randIndex]
-		// }
-		// successTarget <- minTarget
 	}()
 
 	select {
