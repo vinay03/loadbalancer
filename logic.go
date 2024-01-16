@@ -184,27 +184,55 @@ func (lc *LeastConnectionsRoundRobinLogic) Init() {
 func (lc *LeastConnectionsRoundRobinLogic) Next(lb *Balancer) *Target {
 	var successTarget = make(chan *Target, 1)
 	go func() {
-		pool := []*Target{}
+		// cursor := 0
+		// lb.Counter
+		// targetCount := len(lb.Targets)
+		pool := make(map[int]*Target)
 
-		minTarget := lb.Targets[0]
-		pool = append(pool, minTarget)
+		var minTarget *Target
 
-		for _, nextTarget := range lb.Targets[1:] {
-			if nextTarget.Connections < minTarget.Connections {
-				minTarget = nextTarget
-				pool = []*Target{
-					minTarget,
+		for index, nextTarget := range lb.Targets {
+			if nextTarget.IsAlive() {
+				if minTarget == nil || nextTarget.Connections < minTarget.Connections {
+					minTarget = nextTarget
+					pool = make(map[int]*Target)
+					pool[index] = nextTarget
+				} else if nextTarget.Connections == minTarget.Connections {
+					pool[index] = nextTarget
 				}
-			} else if nextTarget.Connections == minTarget.Connections {
-				pool = append(pool, nextTarget)
+			}
+			// lc.Counter++
+		}
+		// fmt.Println(pool)
+		for index, target := range pool {
+			if index >= lc.Counter%len(lb.Targets) {
+				lc.Counter = index + 1
+				successTarget <- target
+				return
 			}
 		}
-		poolSize := len(pool)
-		if poolSize > 1 {
-			randIndex := rand.Intn(poolSize)
-			minTarget = pool[randIndex]
-		}
-		successTarget <- minTarget
+
+		// pool := []*Target{}
+
+		// minTarget := lb.Targets[0]
+		// pool = append(pool, minTarget)
+
+		// for _, nextTarget := range lb.Targets[1:] {
+		// 	if nextTarget.Connections < minTarget.Connections {
+		// 		minTarget = nextTarget
+		// 		pool = []*Target{
+		// 			minTarget,
+		// 		}
+		// 	} else if nextTarget.Connections == minTarget.Connections {
+		// 		pool = append(pool, nextTarget)
+		// 	}
+		// }
+		// poolSize := len(pool)
+		// if poolSize > 1 {
+		// 	randIndex := rand.Intn(poolSize)-
+		// 	minTarget = pool[randIndex]
+		// }
+		// successTarget <- minTarget
 	}()
 
 	select {
