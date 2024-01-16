@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -89,6 +90,50 @@ func Test_Sample(t *testing.T) {
 		}
 
 		requestsEndSync.Wait()
+	})
+
+	t.Run("Check basic balancer config: Least Connections Round Robin Logic", func(t *testing.T) {
+		body := new(TestServerDummyResponse)
+		requestsEndSync := &sync.WaitGroup{}
+		requestsStartSync := &sync.WaitGroup{}
+
+		// totalTargets := 3
+
+		requestsEndSync.Add(1)
+		requestsStartSync.Add(1)
+
+		go func(requestsEndSync *sync.WaitGroup) {
+			requestsStartSync.Done()
+			res := doHTTPPostRequest(Lister1_URL+"delayed-roundrobin", `{ "delay": 1 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, 1, body.ReplicaId, "Logic failed")
+			requestsEndSync.Done()
+		}(requestsEndSync)
+
+		requestsStartSync.Wait()
+		time.Sleep(100 * time.Millisecond)
+
+		// checkReplicaId := 2
+		checkData := []int{2, 3, 2, 3, 2, 3, 2, 3, 2, 3}
+		for _, checkReplicaId := range checkData {
+			body := new(TestServerDummyResponse)
+			res := doHTTPPostRequest(Lister1_URL+"delayed-roundrobin", `{ "delay": 0 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, checkReplicaId, body.ReplicaId, "Invalid balancing logic")
+			time.Sleep(20 * time.Millisecond)
+		}
+		log.Info().Msg("Waiting for long request to finish")
+		requestsEndSync.Wait()
+
+		// checkReplicaId = 1
+		checkData = []int{1, 2, 3, 1, 2, 3, 1, 2, 3, 1}
+		for _, checkReplicaId := range checkData {
+			body := new(TestServerDummyResponse)
+			res := doHTTPPostRequest(Lister1_URL+"delayed-roundrobin", `{ "delay": 0 }`, body)
+			assert.Equal(t, 200, res.StatusCode, "Request failed")
+			assert.Equal(t, checkReplicaId, body.ReplicaId, "Invalid balancing logic")
+			time.Sleep(2000 * time.Microsecond)
+		}
 	})
 
 	// Check Headers
