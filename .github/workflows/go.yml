@@ -25,7 +25,7 @@ jobs:
       run: go version
 
     - name: Test
-      run: go test .
+      run: go run github.com/onsi/ginkgo/v2/ginkgo testing
 
     - name: Build
       run: go build -o lbalancer .
