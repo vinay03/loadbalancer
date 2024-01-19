@@ -1,8 +1,6 @@
 package testing_test
 
 import (
-	"slices"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vinay03/loadbalancer/src"
@@ -49,8 +47,8 @@ var _ = Describe("Random Logic", func() {
 			// Check status code
 			Expect(res.StatusCode).To(Equal(200))
 			// Check replica ID
-			randomReplicaIdCheck := []int{1, 2, 3}
-			Expect(slices.Contains(randomReplicaIdCheck, body.ReplicaId)).To(BeTrue())
+			replicaIdCheck := ((body.ReplicaId) >= 1 && (body.ReplicaId) <= 3)
+			Expect(replicaIdCheck).To(BeTrue())
 		}
 	})
 
