@@ -1,4 +1,4 @@
-package main
+package src
 
 import (
 	"flag"
@@ -25,7 +25,7 @@ type LoadBalancerServiceParams struct {
 	YAMLConfigString   string
 }
 
-func loadFlags() *LoadBalancerServiceParams {
+func LoadFlags() *LoadBalancerServiceParams {
 	params := &LoadBalancerServiceParams{}
 
 	debug := flag.Bool("debug", false, "Sets log level to debug")

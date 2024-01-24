@@ -1,4 +1,4 @@
-package main
+package testing_test
 
 import (
 	"bytes"
@@ -13,6 +13,13 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/gorilla/mux"
+)
+
+var DebugMode bool = true
+
+const (
+	LISTENER_8080_URL = "http://localhost:8080/"
+	LISTENER_8081_URL = "http://localhost:8081/"
 )
 
 type TestServerDummyResponse struct {
@@ -125,21 +132,55 @@ func StopTestServers() {
 	}
 }
 
-func doHTTPGetRequest(requestURL string, v any) *http.Response {
-	res, err := http.Get(requestURL)
+type TestRequest struct {
+	Address string
+	Req     *http.Request
+	Method  string
+}
+
+func Request(URL string) *TestRequest {
+	tr := &TestRequest{}
+	tr.Address = URL
+	return tr
+}
+
+func (tr *TestRequest) Get() (*http.Response, *TestServerDummyResponse) {
+	var err error
+	tr.Req, err = http.NewRequest("GET", tr.Address, nil)
 	if err != nil {
 		fmt.Printf("error making http request: %s\n", err)
 		os.Exit(1)
 	}
+	tr.Req.Header.Add("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(tr.Req)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+
+	v := &TestServerDummyResponse{}
 	json.NewDecoder(res.Body).Decode(v)
-	return res
+	return res, v
 }
 
-func doHTTPPostRequest(requestURL string, postData string, v any) *http.Response {
-	body := []byte(postData)
+func GetDelayedRequestPayload(second int) string {
+	jsonBytes, _ := json.Marshal(struct {
+		Delay int `json:"delay"`
+	}{
+		Delay: second,
+	})
+	jsonString := string(jsonBytes)
+	return jsonString
+}
+
+func (tr *TestRequest) Post(data string) (*http.Response, *TestServerDummyResponse) {
+	var err error
+	body := []byte(data)
 
 	// Create a HTTP post request
-	req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", tr.Address, bytes.NewBuffer(body))
 	if err != nil {
 		panic(err)
 	}
@@ -154,6 +195,7 @@ func doHTTPPostRequest(requestURL string, postData string, v any) *http.Response
 
 	defer res.Body.Close()
 
+	v := &TestServerDummyResponse{}
 	json.NewDecoder(res.Body).Decode(v)
-	return res
+	return res, v
 }

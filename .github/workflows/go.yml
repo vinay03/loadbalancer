@@ -24,8 +24,11 @@ jobs:
     - name: Display Go version
       run: go version
 
+    - name: Download modules
+      run: go mod tidy
+
     - name: Test
-      run: go test .
+      run: go run github.com/onsi/ginkgo/v2/ginkgo testing
 
     - name: Build
       run: go build -o lbalancer .

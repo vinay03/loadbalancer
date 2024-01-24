@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	. "github.com/vinay03/loadbalancer/src"
 )
 
 var LbService LoadBalancerService
@@ -15,7 +17,7 @@ func main() {
 
 	LbService = LoadBalancerService{}
 
-	LbService.SetParams(loadFlags())
+	LbService.SetParams(LoadFlags())
 
 	fmt.Println(PrettyPrint(LbService.Config))
 
