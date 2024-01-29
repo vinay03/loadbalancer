@@ -121,6 +121,8 @@ func (lb *Balancer) UpdateState() {
 }
 
 func (lb *Balancer) AddNewServer(targetConfig *TargetYAMLConfig) {
-	lb.Targets = append(lb.Targets, NewTarget(targetConfig))
+	target := NewTarget(targetConfig)
+	target.MarkAsReachable()
+	lb.Targets = append(lb.Targets, target)
 	lb.UpdateState()
 }
