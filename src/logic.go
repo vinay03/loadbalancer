@@ -108,11 +108,12 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 	targetCount := len(lb.Targets)
 
 	successTarget := make(chan *Target, 1)
-	go func() {
-		for {
+	breakerFlag := false
+	go func(breakerFlag *bool) {
+		for i := 0; i < targetCount; i++ {
 			target := lb.Targets[wrbl.Counter%targetCount]
 			wrbl.WeightCounter++
-			if target.Weight <= wrbl.WeightCounter {
+			if target.Weight <= wrbl.WeightCounter || !target.IsAlive() {
 				wrbl.Counter++
 				wrbl.WeightCounter = 0
 			}
@@ -121,8 +122,11 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 				successTarget <- target
 				return
 			}
+			if *breakerFlag {
+				return
+			}
 		}
-	}()
+	}(&breakerFlag)
 
 	select {
 	case <-time.After(lb.TargetWaitTimeout):
@@ -130,6 +134,7 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 			Str("balancer", lb.Id).
 			Str("mode", lb.Mode).
 			Msg("Request is timing out due to no available targets.")
+		breakerFlag = true
 		return nil
 	case target := <-successTarget:
 		return target

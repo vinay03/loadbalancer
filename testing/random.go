@@ -48,7 +48,7 @@ var _ = Describe("Random Logic", func() {
 		for i := 0; i < 12; i++ {
 			res, body := Request(LISTENER_8080_URL).Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(BeElementOf([]int{1, 2, 3}))
 		}
@@ -58,7 +58,7 @@ var _ = Describe("Random Logic", func() {
 		for i := 0; i < 12; i++ {
 			res, body := Request(LISTENER_8080_URL + "single").Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(1))
 		}
@@ -69,7 +69,7 @@ var _ = Describe("Random Logic", func() {
 		TestServersPool[1].Stop()
 		for i := 0; i < 10; i++ {
 			res, body := Request(LISTENER_8080_URL).Get()
-			if res.StatusCode == 200 {
+			if res.StatusCode == http.StatusOK {
 				// Check replica ID
 				Expect(body.ReplicaId).To(BeElementOf([]int{1, 3}))
 			}
@@ -79,7 +79,7 @@ var _ = Describe("Random Logic", func() {
 
 		for i := 0; i < 10; i++ {
 			res, body := Request(LISTENER_8080_URL).Get()
-			if res.StatusCode == 200 {
+			if res.StatusCode == http.StatusOK {
 				// Check replica ID
 				Expect(body.ReplicaId).To(BeElementOf([]int{3}))
 			}

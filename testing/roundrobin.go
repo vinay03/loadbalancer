@@ -51,7 +51,7 @@ var _ = Describe("Round Robin Logic", func() {
 		for _, expectedReplicaId := range TestData {
 			res, body := Request(LISTENER_8080_URL).Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
@@ -64,7 +64,7 @@ var _ = Describe("Round Robin Logic", func() {
 		for _, expectedReplicaId := range TestData {
 			res, body := Request(LISTENER_8080_URL + "single").Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}

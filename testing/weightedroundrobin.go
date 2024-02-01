@@ -1,6 +1,8 @@
 package testing_test
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vinay03/loadbalancer/src"
@@ -54,7 +56,7 @@ var _ = Describe("Weighted Round Robin Logic", func() {
 		for _, expectedReplicaId := range TestData {
 			res, body := Request(LISTENER_8080_URL).Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
@@ -67,10 +69,55 @@ var _ = Describe("Weighted Round Robin Logic", func() {
 		for _, expectedReplicaId := range TestData {
 			res, body := Request(LISTENER_8080_URL + "single").Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
+	})
+
+	FIt("With Multiple targets of mixed 'IsAlive' status ", func() {
+
+		res, body := Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusOK))
+		Expect(body.ReplicaId).To(Equal(1))
+
+		TestServersPool[0].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData := []int{
+			2, 2, 3, 2, 2, 3, 2, 2, 3, 2, 2,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+			}
+		}
+
+		TestServersPool[2].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData = []int{
+			2, 2, 2, 2, 2, 2, 2,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+			}
+		}
+
+		TestServersPool[1].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
 	})
 
 })
