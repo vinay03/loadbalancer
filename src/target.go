@@ -64,20 +64,22 @@ func (s *Target) MarkAsReachable() {
 	s.Alive = true
 }
 func (s *Target) MarkAsUnreachable() {
+	log.Info().Msg("Target marked as unavailable")
 	s.Alive = false
 }
-func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) {
-	s.Connections++
+func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) bool {
 	crw := &CustomResponseWriter{ResponseWriter: rw}
 
+	s.Connections++
 	s.proxy.ServeHTTP(crw, req)
-
 	s.Connections--
 
 	if crw.Status == http.StatusBadGateway || crw.Status == http.StatusServiceUnavailable {
 		log.Info().Str("address", s.Address).Int("status", crw.Status).Msg("Target is unreachable.\n")
 		s.MarkAsUnreachable()
+		return false
 	}
+	return true
 }
 
 type CustomResponseWriter struct {

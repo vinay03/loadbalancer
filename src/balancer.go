@@ -1,6 +1,7 @@
 package src
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -99,10 +100,11 @@ func (lb *Balancer) AddCustomHeaders(req *http.Request) {
 	}
 }
 
-func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
+func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) error {
 	target := lb.Logic.Next(lb)
 	if target == nil {
-		return
+		log.Info().Msg("No targets found")
+		return errors.New("notfound")
 	}
 	log.Debug().Str("uri", req.RequestURI).Str("balancer", lb.Id).Str("to", target.Address).Msg("- Forwarding request")
 
@@ -110,8 +112,13 @@ func (lb *Balancer) serveProxy(rw http.ResponseWriter, req *http.Request) {
 	// Add Custom headers if matches any
 	lb.AddCustomHeaders(req)
 
-	target.Serve(rw, req)
+	isSuccessful := target.Serve(rw, req)
+
+	if !isSuccessful {
+		log.Info().Str("uri", req.RequestURI).Str("balancer", lb.Id).Str("to", target.Address).Msg("Target unreachable")
+	}
 	lb.liveConnections.Done()
+	return nil
 }
 
 func (lb *Balancer) UpdateState() {

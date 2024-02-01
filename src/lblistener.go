@@ -66,6 +66,7 @@ func (lbs *Listener) Start(startersSync *sync.WaitGroup) (err error) {
 
 // Repeatatively checks whether listener is ready to serve requests
 func (lbs *Listener) checkStateByPoll(startersSync *sync.WaitGroup) {
+	time.Sleep(10 * time.Millisecond)
 	loopBreaker := 1000
 	go func(lbs *Listener, startersSync *sync.WaitGroup) {
 		for {
@@ -180,7 +181,12 @@ func (lbs *Listener) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			Msg("Request received")
 
 		// Pass request to the chosen balancer
-		candidateBalancer.balancer.serveProxy(rw, req)
+		err := candidateBalancer.balancer.serveProxy(rw, req)
+		if err != nil {
+			if err.Error() == "notfound" {
+				rw.WriteHeader(http.StatusServiceUnavailable)
+			}
+		}
 	} else {
 		log.Info().
 			Str("route", requestURL).
