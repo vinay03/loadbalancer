@@ -75,7 +75,7 @@ var _ = Describe("Weighted Round Robin Logic", func() {
 		}
 	})
 
-	FIt("With Multiple targets of mixed 'IsAlive' status ", func() {
+	It("With Multiple targets of mixed 'IsAlive' status ", func() {
 
 		res, body := Request(LISTENER_8080_URL).Get()
 		Expect(res.StatusCode).To(Equal(http.StatusOK))

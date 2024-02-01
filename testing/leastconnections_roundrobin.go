@@ -1,6 +1,7 @@
 package testing_test
 
 import (
+	"net/http"
 	"sync"
 	"time"
 
@@ -95,6 +96,70 @@ var _ = Describe("Least Connections - Round Robin Logic", func() {
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
+	})
+
+	It("With Multiple targets of mixed 'IsAlive' status ", func() {
+		delayedRequestEndWG := &sync.WaitGroup{}
+		delayedRequestStartWG := &sync.WaitGroup{}
+
+		delayedRequestEndWG.Add(1)
+		delayedRequestStartWG.Add(1)
+
+		go func() {
+			delayedRequestStartWG.Done()
+			payload := GetDelayedRequestPayload(2) // Delayed for 2 second
+			res, _ := Request(LISTENER_8080_URL + "delayed").Post(payload)
+			// Check status code
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			delayedRequestEndWG.Done()
+		}()
+
+		delayedRequestStartWG.Wait()
+		time.Sleep(100 * time.Millisecond)
+
+		TestData := []int{
+			2, 3, 2, 3, 2, 3, 2,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+		}
+
+		TestServersPool[2].Stop()
+
+		res, _ := Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData = []int{
+			2, 2, 2, 2, 2,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			// Check replica ID
+			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+		}
+
+		TestServersPool[1].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData = []int{
+			1, 1, 1, 1, 1,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
+			// Check replica ID
+			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+		}
+
+		TestServersPool[0].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 	})
 
 })

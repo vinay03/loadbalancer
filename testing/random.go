@@ -65,7 +65,6 @@ var _ = Describe("Random Logic", func() {
 	})
 
 	It("With Multiple targets of mixed 'IsAlive' status ", func() {
-
 		TestServersPool[1].Stop()
 		for i := 0; i < 10; i++ {
 			res, body := Request(LISTENER_8080_URL).Get()
@@ -89,6 +88,5 @@ var _ = Describe("Random Logic", func() {
 
 		res, _ := Request(LISTENER_8080_URL).Get()
 		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
-
 	})
 })

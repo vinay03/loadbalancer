@@ -159,13 +159,15 @@ func (lc *LeastConnectionsRandomLogic) Next(lb *Balancer) *Target {
 		pool = append(pool, minTarget)
 
 		for _, nextTarget := range lb.Targets[1:] {
-			if nextTarget.Connections < minTarget.Connections {
-				minTarget = nextTarget
-				pool = []*Target{
-					minTarget,
+			if nextTarget.IsAlive() {
+				if nextTarget.Connections < minTarget.Connections {
+					minTarget = nextTarget
+					pool = []*Target{
+						minTarget,
+					}
+				} else if nextTarget.Connections == minTarget.Connections {
+					pool = append(pool, nextTarget)
 				}
-			} else if nextTarget.Connections == minTarget.Connections {
-				pool = append(pool, nextTarget)
 			}
 		}
 		poolSize := len(pool)
