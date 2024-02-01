@@ -20,7 +20,11 @@ var DebugMode bool = true
 const (
 	LISTENER_8080_URL = "http://localhost:8080/"
 	LISTENER_8081_URL = "http://localhost:8081/"
+
+	TestServerPortStart = 8090
 )
+
+var AllTestServersSync *sync.WaitGroup
 
 type TestServerDummyResponse struct {
 	Message   string            `json:"message"`
@@ -28,7 +32,7 @@ type TestServerDummyResponse struct {
 	Headers   map[string]string `json:"_headers"`
 }
 
-func GetNumberedHandler(ReplicaNumber int, defaultDelayInterval time.Duration) func(http.ResponseWriter, *http.Request) {
+func GetNumberedHandler(testserver *TestServer, ReplicaNumber int, defaultDelayInterval time.Duration) func(http.ResponseWriter, *http.Request) {
 	return func(rw http.ResponseWriter, req *http.Request) {
 		delayInterval := defaultDelayInterval
 
@@ -67,37 +71,61 @@ func GetNumberedHandler(ReplicaNumber int, defaultDelayInterval time.Duration) f
 	}
 }
 
-var TestServersPool []*http.Server
+type TestServer struct {
+	Srv           *http.Server
+	ReplicaNumber int
+	Port          int
+}
+
+func NewTestServer(ReplicaNumber int) *TestServer {
+	testserver := &TestServer{}
+	port := TestServerPortStart + ReplicaNumber
+	testserver.Port = port
+
+	testserver.Srv = &http.Server{
+		Addr: fmt.Sprintf(":%v", port),
+	}
+	testserver.Srv.Addr = fmt.Sprintf(":%v", port)
+
+	router := &mux.Router{}
+
+	handlerFunc := GetNumberedHandler(testserver, ReplicaNumber, 0*time.Second)
+	router.HandleFunc("/", handlerFunc).Methods("GET")
+	router.HandleFunc("/{path}", handlerFunc).Methods("GET", "POST")
+
+	delayedHandlerFunc := GetNumberedHandler(testserver, ReplicaNumber, 0*time.Second)
+	router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET", "POST")
+
+	testserver.Srv.Handler = router
+	return testserver
+}
+
+func (ts *TestServer) Start() {
+	url := "http://localhost" + ts.Srv.Addr + "/"
+	go TestServerCheckState(url, AllTestServersSync)
+	go ts.Srv.ListenAndServe()
+}
+func (ts *TestServer) Stop() {
+	ts.Srv.Shutdown(context.Background())
+}
+
+var TestServersPool []*TestServer
 
 func StartTestServers(replicasCount int) {
-	serverPortStart := 8090
+	// serverPortStart := 8090
 
-	TestServersPool = make([]*http.Server, replicasCount)
-	TestServersSync := &sync.WaitGroup{}
-	TestServersSync.Add(replicasCount)
+	TestServersPool = make([]*TestServer, replicasCount)
+	AllTestServersSync = &sync.WaitGroup{}
+	AllTestServersSync.Add(replicasCount)
 
-	for index, srv := range TestServersPool {
-		srv = &http.Server{}
-		TestServersPool[index] = srv
+	for index, _ := range TestServersPool {
 		ReplicaNumber := index + 1
-		port := serverPortStart + ReplicaNumber
-		srv.Addr = fmt.Sprintf(":%v", port)
-		router := &mux.Router{}
-
-		handlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
-		router.HandleFunc("/", handlerFunc).Methods("GET")
-		router.HandleFunc("/{path}", handlerFunc).Methods("GET", "POST")
-
-		delayedHandlerFunc := GetNumberedHandler(ReplicaNumber, 0*time.Second)
-		router.HandleFunc("/delayed", delayedHandlerFunc).Methods("GET", "POST")
-
-		srv.Handler = router
-		url := "http://localhost" + srv.Addr + "/"
-		go TestServerCheckState(url, TestServersSync)
-		go srv.ListenAndServe()
+		testserver := NewTestServer(ReplicaNumber)
+		TestServersPool[index] = testserver
+		testserver.Start()
 	}
 	log.Info().Msg("Waiting till the test servers are up")
-	TestServersSync.Wait()
+	AllTestServersSync.Wait()
 }
 
 func TestServerCheckState(requestURL string, TestServerSync *sync.WaitGroup) {
@@ -127,8 +155,8 @@ func TestServerCheckState(requestURL string, TestServerSync *sync.WaitGroup) {
 }
 
 func StopTestServers() {
-	for _, srv := range TestServersPool {
-		srv.Shutdown(context.Background())
+	for _, testserver := range TestServersPool {
+		testserver.Stop()
 	}
 }
 

@@ -122,7 +122,7 @@ var _ = Describe("Features :", func() {
 			{LISTENER_8081_URL, ""}, // Custom headers not specified in YAML
 		}
 		for _, testRecord := range TestData {
-			body := new(TestServerDummyResponse)
+			// body := new(TestServerDummyResponse)
 			res, body := Request(testRecord[0]).Get()
 			// Check status code
 			Expect(res.StatusCode).To(Equal(200))
@@ -130,4 +130,6 @@ var _ = Describe("Features :", func() {
 			Expect(body.Headers["Forwarded-By"]).To(Equal(testRecord[1]))
 		}
 	})
+
+	// Test `targetWaitTimeout` feature
 })

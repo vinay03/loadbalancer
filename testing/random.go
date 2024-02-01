@@ -4,6 +4,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vinay03/loadbalancer/src"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 var _ = Describe("Random Logic", func() {
@@ -47,8 +50,7 @@ var _ = Describe("Random Logic", func() {
 			// Check status code
 			Expect(res.StatusCode).To(Equal(200))
 			// Check replica ID
-			replicaIdCheck := ((body.ReplicaId) >= 1 && (body.ReplicaId) <= 3)
-			Expect(replicaIdCheck).To(BeTrue())
+			Expect(body.ReplicaId).To(BeElementOf([]int{1, 2, 3}))
 		}
 	})
 
@@ -60,5 +62,33 @@ var _ = Describe("Random Logic", func() {
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(1))
 		}
+	})
+
+	It("With Multiple targets of mixed 'IsAlive' status ", func() {
+
+		TestServersPool[1].Stop()
+		for i := 0; i < 10; i++ {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(BeElementOf([]int{1, 3}))
+			}
+		}
+
+		TestServersPool[0].Stop()
+
+		for i := 0; i < 10; i++ {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(BeElementOf([]int{3}))
+			}
+		}
+
+		TestServersPool[2].Stop()
+
+		res, _ := Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
 	})
 })

@@ -1,6 +1,8 @@
 package testing_test
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vinay03/loadbalancer/src"
@@ -66,6 +68,51 @@ var _ = Describe("Round Robin Logic", func() {
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
+	})
+
+	It("With Multiple targets of mixed 'IsAlive' status ", func() {
+
+		res, body := Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusOK))
+		Expect(body.ReplicaId).To(Equal(1))
+
+		TestServersPool[1].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData := []int{
+			3, 1, 3, 1, 3, 1, 3, 1, 3,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+			}
+		}
+
+		TestServersPool[0].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
+		TestData = []int{
+			3, 3, 3, 3, 3,
+		}
+		for _, expectedReplicaId := range TestData {
+			res, body := Request(LISTENER_8080_URL).Get()
+			if res.StatusCode == 200 {
+				// Check replica ID
+				Expect(body.ReplicaId).To(Equal(expectedReplicaId))
+			}
+		}
+
+		TestServersPool[2].Stop()
+
+		res, _ = Request(LISTENER_8080_URL).Get()
+		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
+
 	})
 
 })
