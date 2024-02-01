@@ -16,6 +16,7 @@ type Target struct {
 	proxy       *httputil.ReverseProxy
 	Weight      int
 	Connections int64
+	Alive       bool
 }
 
 type TargetYAMLConfig struct {
@@ -56,10 +57,37 @@ func NewTarget(targetConfig *TargetYAMLConfig) *Target {
 }
 
 func (s *Target) IsAlive() bool {
+	// TODO: Check whether s.Address is reachable
+	return s.Alive
+}
+func (s *Target) MarkAsReachable() {
+	s.Alive = true
+}
+func (s *Target) MarkAsUnreachable() {
+	log.Info().Msg("Target marked as unavailable")
+	s.Alive = false
+}
+func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) bool {
+	crw := &CustomResponseWriter{ResponseWriter: rw}
+
+	s.Connections++
+	s.proxy.ServeHTTP(crw, req)
+	s.Connections--
+
+	if crw.Status == http.StatusBadGateway || crw.Status == http.StatusServiceUnavailable {
+		log.Info().Str("address", s.Address).Int("status", crw.Status).Msg("Target is unreachable.\n")
+		s.MarkAsUnreachable()
+		return false
+	}
 	return true
 }
-func (s *Target) Serve(rw http.ResponseWriter, req *http.Request) {
-	s.Connections++
-	s.proxy.ServeHTTP(rw, req)
-	s.Connections--
+
+type CustomResponseWriter struct {
+	http.ResponseWriter
+	Status int
+}
+
+func (scrw *CustomResponseWriter) WriteHeader(code int) {
+	scrw.Status = code
+	scrw.ResponseWriter.WriteHeader(code)
 }

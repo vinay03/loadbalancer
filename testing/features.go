@@ -1,6 +1,8 @@
 package testing_test
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/vinay03/loadbalancer/src"
@@ -91,7 +93,7 @@ var _ = Describe("Features :", func() {
 	It("Custom Static Headers", func() {
 		res, body := Request(LISTENER_8080_URL).Get()
 		// Check status code
-		Expect(res.StatusCode).To(Equal(200))
+		Expect(res.StatusCode).To(Equal(http.StatusOK))
 		// Check header value
 		Expect(body.Headers["Custom-Header"]).To(Equal("custom-value"))
 	})
@@ -105,7 +107,7 @@ var _ = Describe("Features :", func() {
 		}
 		res, body := Request(LISTENER_8080_URL).Get()
 		// Check status code
-		Expect(res.StatusCode).To(Equal(200))
+		Expect(res.StatusCode).To(Equal(http.StatusOK))
 		for headerKey, headerValue := range TestData {
 			Expect(body.Headers[headerKey]).To(Equal(headerValue))
 		}
@@ -122,12 +124,14 @@ var _ = Describe("Features :", func() {
 			{LISTENER_8081_URL, ""}, // Custom headers not specified in YAML
 		}
 		for _, testRecord := range TestData {
-			body := new(TestServerDummyResponse)
+			// body := new(TestServerDummyResponse)
 			res, body := Request(testRecord[0]).Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check "Forwarded-By" header
 			Expect(body.Headers["Forwarded-By"]).To(Equal(testRecord[1]))
 		}
 	})
+
+	// Test `targetWaitTimeout` feature
 })
