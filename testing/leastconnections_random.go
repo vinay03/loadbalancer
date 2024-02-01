@@ -61,7 +61,7 @@ var _ = Describe("Least Connections - Random Logic", func() {
 			payload := GetDelayedRequestPayload(1)
 			res, body := Request(LISTENER_8080_URL + "delayed").Post(payload)
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 
 			longRequestReplicaNumber = body.ReplicaId
 			delayedRequestEndSync.Done()
@@ -73,7 +73,7 @@ var _ = Describe("Least Connections - Random Logic", func() {
 		for i := 0; i < 10; i++ {
 			res, body := Request(LISTENER_8080_URL + "delayed").Post(GetDelayedRequestPayload(0))
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			replicaIdCheck := (body.ReplicaId >= 1 && body.ReplicaId <= totalTargets && body.ReplicaId != longRequestReplicaNumber)
 			Expect(replicaIdCheck).To(BeTrue())
 		}
@@ -88,7 +88,7 @@ var _ = Describe("Least Connections - Random Logic", func() {
 		for _, expectedReplicaId := range TestData {
 			res, body := Request(LISTENER_8080_URL + "single").Get()
 			// Check status code
-			Expect(res.StatusCode).To(Equal(200))
+			Expect(res.StatusCode).To(Equal(http.StatusOK))
 			// Check replica ID
 			Expect(body.ReplicaId).To(Equal(expectedReplicaId))
 		}
