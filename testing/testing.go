@@ -172,6 +172,12 @@ func Request(URL string) *TestRequest {
 	return tr
 }
 
+func (tr *TestRequest) GetWG(endWG *sync.WaitGroup) (*http.Response, *TestServerDummyResponse) {
+	res, body := tr.Get()
+	endWG.Done()
+	return res, body
+}
+
 func (tr *TestRequest) Get() (*http.Response, *TestServerDummyResponse) {
 	var err error
 	tr.Req, err = http.NewRequest("GET", tr.Address, nil)

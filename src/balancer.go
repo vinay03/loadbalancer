@@ -38,7 +38,10 @@ type Balancer struct {
 	State             LB_STATE
 	CustomHeaderRules []CustomHeaderRule
 	// NextAvailableServer func(lb *Balancer) *Target
-	Logic BalancerLogic
+	Logic               BalancerLogic
+	DebugMode           bool
+	DeubgDataMutext     *sync.Mutex
+	DebugIndicesHistory []int
 }
 
 var LoadBalancersPool map[string]*Balancer
@@ -64,6 +67,8 @@ func (lb *Balancer) SetBalancerLogic() {
 	if lb.Logic != nil {
 		lb.Logic.Init()
 	}
+
+	lb.DeubgDataMutext = &sync.Mutex{}
 }
 
 func (lb *Balancer) IsAvailable() bool {

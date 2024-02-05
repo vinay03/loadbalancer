@@ -53,11 +53,13 @@ func (rl *RandomLogic) Next(lb *Balancer) *Target {
 
 /****** Round Robin *******/
 type RoundRobinLogic struct {
-	Counter int
+	Counter      int
+	CounterMutex *sync.Mutex
 }
 
 func (rbl *RoundRobinLogic) Init() {
 	rbl.Counter = 0
+	rbl.CounterMutex = &sync.Mutex{}
 }
 
 func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
@@ -66,18 +68,25 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 	var successTarget = make(chan *Target, 1)
 	breakerFlag := false
 	go func(breakerFlag *bool) {
+		rbl.CounterMutex.Lock()
 		for i := 0; i < targetCount; i++ {
 			target := lb.Targets[rbl.Counter%targetCount]
 			rbl.Counter++
 			if target.IsAlive() {
+				if lb.DebugMode {
+					lb.DeubgDataMutext.Lock()
+					lb.DebugIndicesHistory = append(lb.DebugIndicesHistory, (rbl.Counter-1)%targetCount)
+					lb.DeubgDataMutext.Unlock()
+				}
 				rbl.Counter = rbl.Counter % targetCount
 				successTarget <- target
-				return
+				break
 			}
 			if *breakerFlag {
-				return
+				break
 			}
 		}
+		rbl.CounterMutex.Unlock()
 	}(&breakerFlag)
 
 	select {

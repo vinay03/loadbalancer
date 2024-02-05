@@ -1,7 +1,10 @@
 package testing_test
 
 import (
+	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -113,6 +116,34 @@ var _ = Describe("Round Robin Logic", func() {
 		res, _ = Request(LISTENER_8080_URL).Get()
 		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
+	})
+
+	FIt("Load Tests", func() {
+		LbTestService.Listeners[0].Balancers[0].DebugMode = true
+
+		endWG := &sync.WaitGroup{}
+
+		repeatations := 6000
+		endWG.Add(repeatations * 3)
+
+		for i := 0; i < repeatations*3; i++ {
+			req := Request(LISTENER_8080_URL)
+			go req.GetWG(endWG)
+		}
+		// time.Sleep(2 * time.Second)
+		endWG.Wait()
+		var history *[]int = &LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory
+		fmt.Println("Length: ", len(*history))
+		// fmt.Println(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory)
+		for i := 0; i < repeatations*3; i += 3 {
+			roundCheck := (LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i] == 0) &&
+				(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i+1] == 1) &&
+				(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i+2] == 2)
+			Expect(roundCheck).To(BeTrue())
+		}
+		time.Sleep(800)
+
+		LbTestService.Listeners[0].Balancers[0].DebugMode = false
 	})
 
 })
