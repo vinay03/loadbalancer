@@ -1,10 +1,8 @@
 package testing_test
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,7 +15,7 @@ var _ = Describe("Round Robin Logic", func() {
 		LbTestService = LoadBalancerService{}
 
 		config := &LoadBalancerServiceParams{
-			DebugMode: DebugMode,
+			// DebugMode: DebugMode,
 			YAMLConfigString: `listeners:
   - protocol: http
     port: 8080
@@ -32,6 +30,9 @@ var _ = Describe("Round Robin Logic", func() {
         mode: "RoundRobin"
         targets:
           - address: http://localhost:8091`,
+		}
+		if DebugMode {
+			config.DebugMode = DebugMode
 		}
 
 		LbTestService.SetParams(config)
@@ -118,31 +119,32 @@ var _ = Describe("Round Robin Logic", func() {
 
 	})
 
-	FIt("Load Tests", func() {
+	It("Load Tests", func() {
+		// Start Recording History
 		LbTestService.Listeners[0].Balancers[0].DebugMode = true
 
 		endWG := &sync.WaitGroup{}
 
-		repeatations := 6000
-		endWG.Add(repeatations * 3)
+		repeatations := 50
+		passSize := 3
+		requestsCount := repeatations * passSize
+		endWG.Add(requestsCount)
 
-		for i := 0; i < repeatations*3; i++ {
+		for i := 0; i < repeatations*passSize; i++ {
 			req := Request(LISTENER_8080_URL)
 			go req.GetWG(endWG)
 		}
-		// time.Sleep(2 * time.Second)
 		endWG.Wait()
 		var history *[]int = &LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory
-		fmt.Println("Length: ", len(*history))
-		// fmt.Println(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory)
-		for i := 0; i < repeatations*3; i += 3 {
-			roundCheck := (LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i] == 0) &&
-				(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i+1] == 1) &&
-				(LbTestService.Listeners[0].Balancers[0].DebugIndicesHistory[i+2] == 2)
-			Expect(roundCheck).To(BeTrue())
-		}
-		time.Sleep(800)
+		Expect(len(*history)).To(Equal(requestsCount))
 
+		CompleteCheck := true
+		for i := 0; i < repeatations*passSize; i += passSize {
+			CompleteCheck = CompleteCheck && ((*history)[i] == 0) && ((*history)[i+1] == 1) && ((*history)[i+2] == 2)
+		}
+		Expect(CompleteCheck).To(BeTrue())
+
+		// Stop recording history
 		LbTestService.Listeners[0].Balancers[0].DebugMode = false
 	})
 

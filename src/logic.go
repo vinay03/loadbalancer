@@ -69,14 +69,15 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 	breakerFlag := false
 	go func(breakerFlag *bool) {
 		rbl.CounterMutex.Lock()
+		defer rbl.CounterMutex.Unlock()
+		var targetIndex int
 		for i := 0; i < targetCount; i++ {
-			target := lb.Targets[rbl.Counter%targetCount]
+			targetIndex = rbl.Counter % targetCount
+			target := lb.Targets[targetIndex]
 			rbl.Counter++
 			if target.IsAlive() {
 				if lb.DebugMode {
-					lb.DeubgDataMutext.Lock()
-					lb.DebugIndicesHistory = append(lb.DebugIndicesHistory, (rbl.Counter-1)%targetCount)
-					lb.DeubgDataMutext.Unlock()
+					lb.recordIndex(targetIndex)
 				}
 				rbl.Counter = rbl.Counter % targetCount
 				successTarget <- target
@@ -86,7 +87,6 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 				break
 			}
 		}
-		rbl.CounterMutex.Unlock()
 	}(&breakerFlag)
 
 	select {
@@ -106,11 +106,13 @@ func (rbl *RoundRobinLogic) Next(lb *Balancer) *Target {
 type WeightedRoundRobinLogic struct {
 	Counter       int
 	WeightCounter int
+	CounterMutex  *sync.Mutex
 }
 
 func (wrbl *WeightedRoundRobinLogic) Init() {
 	wrbl.Counter = 0
 	wrbl.WeightCounter = 0
+	wrbl.CounterMutex = &sync.Mutex{}
 }
 
 func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
@@ -119,14 +121,22 @@ func (wrbl *WeightedRoundRobinLogic) Next(lb *Balancer) *Target {
 	successTarget := make(chan *Target, 1)
 	breakerFlag := false
 	go func(breakerFlag *bool) {
+		wrbl.CounterMutex.Lock()
+		defer wrbl.CounterMutex.Unlock()
+		var targetIndex, weightIndex int
 		for i := 0; i < targetCount; i++ {
-			target := lb.Targets[wrbl.Counter%targetCount]
+			targetIndex = wrbl.Counter % targetCount
+			weightIndex = wrbl.WeightCounter
+			target := lb.Targets[targetIndex]
 			wrbl.WeightCounter++
-			if target.Weight <= wrbl.WeightCounter || !target.IsAlive() {
+			if wrbl.WeightCounter >= target.Weight || !target.IsAlive() {
 				wrbl.Counter++
 				wrbl.WeightCounter = 0
 			}
 			if target.IsAlive() {
+				if lb.DebugMode {
+					lb.recordWeightedIndex(targetIndex, weightIndex)
+				}
 				wrbl.Counter %= targetCount
 				successTarget <- target
 				return

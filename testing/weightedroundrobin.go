@@ -2,6 +2,7 @@ package testing_test
 
 import (
 	"net/http"
+	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -118,6 +119,41 @@ var _ = Describe("Weighted Round Robin Logic", func() {
 		res, _ = Request(LISTENER_8080_URL).Get()
 		Expect(res.StatusCode).To(Equal(http.StatusBadGateway))
 
+	})
+
+	It("Load Tests", func() {
+		// Start Recording History
+		LbTestService.Listeners[0].Balancers[0].DebugMode = true
+
+		endWG := &sync.WaitGroup{}
+
+		repeatations := 50
+		passSize := 6
+		requestsCount := repeatations * passSize
+		endWG.Add(requestsCount)
+
+		for i := 0; i < repeatations*passSize; i++ {
+			req := Request(LISTENER_8080_URL)
+			go req.GetWG(endWG)
+		}
+		endWG.Wait()
+		var history *[][2]int = &LbTestService.Listeners[0].Balancers[0].DebugWeightedIndicesHistory
+		Expect(len(*history)).To(Equal(requestsCount))
+
+		CompleteCheck := true
+		for i := 0; i < requestsCount; i += passSize {
+			CompleteCheck = CompleteCheck &&
+				((*history)[i] == [2]int{0, 0}) &&
+				((*history)[i+1] == [2]int{0, 1}) &&
+				((*history)[i+2] == [2]int{0, 2}) &&
+				((*history)[i+3] == [2]int{1, 0}) &&
+				((*history)[i+4] == [2]int{1, 1}) &&
+				((*history)[i+5] == [2]int{2, 0})
+		}
+		Expect(CompleteCheck).To(BeTrue())
+
+		// Stop recording history
+		LbTestService.Listeners[0].Balancers[0].DebugMode = false
 	})
 
 })
