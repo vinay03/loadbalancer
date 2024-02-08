@@ -28,6 +28,24 @@ type CustomHeaderRule struct {
 	Headers []CustomHeader
 }
 
+type BalancerDebugger struct {
+	DebugMode                   bool
+	DeubgDataMutext             *sync.Mutex
+	DebugIndicesHistory         []int
+	DebugWeightedIndicesHistory [][2]int
+}
+
+func (bd *BalancerDebugger) recordIndex(index int) {
+	bd.DeubgDataMutext.Lock()
+	bd.DebugIndicesHistory = append(bd.DebugIndicesHistory, index)
+	bd.DeubgDataMutext.Unlock()
+}
+func (bd *BalancerDebugger) recordWeightedIndex(index int, weight int) {
+	bd.DeubgDataMutext.Lock()
+	bd.DebugWeightedIndicesHistory = append(bd.DebugWeightedIndicesHistory, [2]int{index, weight})
+	bd.DeubgDataMutext.Unlock()
+}
+
 type Balancer struct {
 	liveConnections   sync.WaitGroup
 	Id                string
@@ -39,6 +57,7 @@ type Balancer struct {
 	CustomHeaderRules []CustomHeaderRule
 	// NextAvailableServer func(lb *Balancer) *Target
 	Logic BalancerLogic
+	BalancerDebugger
 }
 
 var LoadBalancersPool map[string]*Balancer
@@ -64,6 +83,8 @@ func (lb *Balancer) SetBalancerLogic() {
 	if lb.Logic != nil {
 		lb.Logic.Init()
 	}
+
+	lb.DeubgDataMutext = &sync.Mutex{}
 }
 
 func (lb *Balancer) IsAvailable() bool {
