@@ -12,6 +12,7 @@ import (
 
 type LB_STATE int
 
+// Loadbalancer states
 const (
 	LB_STATE_INIT    LB_STATE = 0
 	LB_STATE_ACTIVE  LB_STATE = 1
